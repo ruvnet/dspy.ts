@@ -13,12 +13,12 @@ export abstract class Module<TInput extends Record<string, any>, TOutput extends
   constructor(options: {
     name: string;
     signature: Signature;
-    promptTemplate: (input: TInput) => string;
+    promptTemplate?: (input: TInput) => string;
     strategy: 'Predict' | 'ChainOfThought' | 'ReAct';
   }) {
     this.name = options.name;
     this.signature = options.signature;
-    this.promptTemplate = options.promptTemplate;
+    this.promptTemplate = options.promptTemplate || ((input: TInput) => JSON.stringify(input));
     this.strategy = options.strategy;
   }
 
@@ -35,7 +35,7 @@ export abstract class Module<TInput extends Record<string, any>, TOutput extends
   protected validateInput(input: TInput): void {
     for (const field of this.signature.inputs) {
       const value = input[field.name];
-      
+
       // Check required fields
       if (field.required && value === undefined) {
         throw new Error(`Missing required input field: ${field.name}`);
@@ -78,7 +78,7 @@ export abstract class Module<TInput extends Record<string, any>, TOutput extends
   protected validateOutput(output: TOutput): void {
     for (const field of this.signature.outputs) {
       const value = output[field.name];
-      
+
       // Check required fields
       if (field.required && value === undefined) {
         throw new Error(`Missing required output field: ${field.name}`);
