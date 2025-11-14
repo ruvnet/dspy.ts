@@ -1,5 +1,12 @@
 # DSPy.ts 🚀
 
+[![npm version](https://badge.fury.io/js/dspy.ts.svg)](https://www.npmjs.com/package/dspy.ts)
+[![npm downloads](https://img.shields.io/npm/dm/dspy.ts.svg)](https://www.npmjs.com/package/dspy.ts)
+[![GitHub stars](https://img.shields.io/github/stars/ruvnet/dspy.ts.svg?style=social&label=Star)](https://github.com/ruvnet/dspy.ts)
+[![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Build Status](https://img.shields.io/github/workflow/status/ruvnet/dspy.ts/CI)](https://github.com/ruvnet/dspy.ts/actions)
+
 DSPy.ts helps you build powerful AI applications right in your web browser. It's based on Stanford's DSPy framework but made specifically for JavaScript and TypeScript developers. Unlike traditional AI frameworks that require expensive servers and complex infrastructure, DSPy.ts lets you create and run sophisticated AI models directly in your users' browsers. This means you can build everything from smart chatbots to image recognition systems that work entirely on your users' devices, making your AI applications faster, cheaper, and more private.
 
 Here's what makes it special:
@@ -83,9 +90,6 @@ const researcher = new ReActModule({
 // 5. Learn from feedback
 ```
 
-[![npm version](https://badge.fury.io/js/dspy.ts.svg)](https://badge.fury.io/js/dspy.ts)
-[![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## 🌟 Why DSPy.ts?
 

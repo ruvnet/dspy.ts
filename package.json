@@ -1,32 +1,76 @@
 {
   "name": "dspy.ts",
-  "version": "0.1.3",
-  "description": "DSPy.ts - Declarative Self-Learning TypeScript: A framework for compositional LM pipelines with self-improving prompt strategies.",
+  "version": "2.0.0",
+  "description": "DSPy.ts 2.0 - Advanced declarative AI framework with multi-agent orchestration, self-learning capabilities, and state-of-the-art optimizers. Powered by AgentDB, ReasoningBank, and Swarm architecture.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "tsc",
+    "build:prod": "tsc --project tsconfig.prod.json",
     "test": "jest --coverage",
+    "test:unit": "jest --testPathPattern=tests/unit",
+    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:watch": "jest --watch",
+    "benchmark": "node --loader ts-node/esm tests/benchmarks/run-benchmarks.ts",
     "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
-    "prepublishOnly": "npm run build"
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run test && npm run build",
+    "docs": "typedoc --out docs/api src/index.ts",
+    "clean": "rm -rf dist coverage"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/ruvnet/dspy.ts.git"
   },
+  "bugs": {
+    "url": "https://github.com/ruvnet/dspy.ts/issues"
+  },
   "homepage": "https://github.com/ruvnet/dspy.ts",
   "keywords": [
+    "dspy",
     "dspy.ts",
-    "declarative",
+    "agentdb",
+    "reasoning-bank",
+    "swarm",
+    "multi-agent",
+    "ai-agents",
+    "llm",
     "language-model",
-    "ONNX",
-    "JS-PyTorch",
     "self-learning",
-    "pipeline"
+    "machine-learning",
+    "prompt-optimization",
+    "mipro",
+    "miprov2",
+    "chain-of-thought",
+    "react",
+    "reasoning",
+    "onnx",
+    "pytorch",
+    "typescript",
+    "ai-framework",
+    "declarative",
+    "pipeline",
+    "optimization",
+    "vector-database",
+    "memory-system",
+    "causal-reasoning",
+    "reflexion",
+    "bayesian-optimization"
   ],
   "author": "rUv",
   "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "@types/node": "^22.13.5",
@@ -36,11 +80,27 @@
     "jest": "^29.7.0",
     "prettier": "^3.5.2",
     "ts-jest": "^29.2.5",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "typedoc": "^0.26.0",
+    "@types/async-retry": "^1.4.8",
+    "@types/pino": "^7.0.5"
   },
   "dependencies": {
+    "agentdb": "^1.3.9",
+    "inversify": "^6.0.2",
+    "reflect-metadata": "^0.2.1",
+    "zod": "^3.22.4",
+    "async-retry": "^1.3.3",
+    "pino": "^8.19.0",
+    "pino-pretty": "^11.0.0",
     "js-pytorch": "^0.7.2",
     "onnxruntime-web": "^1.20.1",
     "ts-node": "^10.9.2"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "optionalDependencies": {
+    "@mlflow/tracking": "^0.1.0"
   }
 }
