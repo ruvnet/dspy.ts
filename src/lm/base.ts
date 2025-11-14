@@ -36,8 +36,35 @@ export interface LMDriver {
  * Error class for LM-related errors
  */
 export class LMError extends Error {
-  constructor(message: string, public readonly cause?: Error) {
-    super(message);
+  public code?: string;
+  public cause?: Error;
+
+  constructor(message: string | Error, codeOrCause?: string | Error) {
+    const msg = typeof message === 'string' ? message : message.message;
+    super(msg);
     this.name = 'LMError';
+
+    if (typeof codeOrCause === 'string') {
+      this.code = codeOrCause;
+    } else if (codeOrCause instanceof Error) {
+      this.cause = codeOrCause;
+    }
   }
+}
+
+// Global LM instance
+let globalLM: LMDriver | null = null;
+
+/**
+ * Configure the global language model
+ */
+export function configureLM(lm: LMDriver): void {
+  globalLM = lm;
+}
+
+/**
+ * Get the global language model
+ */
+export function getLM(): LMDriver | null {
+  return globalLM;
 }
