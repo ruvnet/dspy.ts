@@ -66,18 +66,26 @@ const optimizedSolver = await optimizer.compile(solver, examples);
 
 DSPy.ts is a **complete TypeScript implementation** of DSPy's core concepts with additional enterprise features:
 
-| Feature | DSPy Python | DSPy.ts 2.0 | Notes |
+| Feature | DSPy Python | DSPy.ts 2.1 | Notes |
 |---------|-------------|-------------|-------|
 | **Core Modules** |
 | Predict | ✅ | ✅ | Basic prediction module |
 | ChainOfThought | ✅ | ✅ | Step-by-step reasoning |
 | ReAct | ✅ | ✅ | Reasoning + Acting with tools |
+| Retrieve | ✅ | ✅ | RAG with vector search |
+| ProgramOfThought | ✅ | ✅ | Code generation & execution |
+| MultiChainComparison | ✅ | ✅ | Compare multiple reasoning paths |
+| Refine | ✅ | ✅ | Constraint-based refinement |
+| majority | ✅ | ✅ | Voting & consensus |
 | Signatures | ✅ | ✅ | Type-safe input/output specs |
 | Pipeline | ✅ | ✅ | Module composition |
 | **Optimizers** |
 | BootstrapFewShot | ✅ | ✅ | Automatic demo generation |
-| MIPROv2 | ✅ | 🔄 | In development |
+| MIPROv2 | ✅ | ✅ | Bayesian prompt optimization |
 | COPRO | ✅ | 📋 | Planned |
+| **Evaluation** |
+| Metrics | ✅ | ✅ | F1, BLEU, ROUGE, exactMatch |
+| evaluate() | ✅ | ✅ | Batch evaluation |
 | **Runtime** |
 | Python | ✅ | ❌ | Python 3.9+ |
 | Node.js | ❌ | ✅ | Node.js 18+ |
