@@ -1,6 +1,6 @@
 {
   "name": "dspy.ts",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "DSPy.ts 2.0 - Advanced declarative AI framework with multi-agent orchestration, self-learning capabilities, and state-of-the-art optimizers. Powered by AgentDB, ReasoningBank, and Swarm architecture.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

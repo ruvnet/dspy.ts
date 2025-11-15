@@ -723,6 +723,42 @@ DSPy.ts follows a modular, layered architecture:
 
 ---
 
+## 🗺️ Roadmap
+
+### Upcoming Features
+
+We're committed to achieving 100% DSPy Python compliance and expanding capabilities. Here's what's next:
+
+#### Core Modules (Q1 2025)
+- ⏳ **MIPROv2 Optimizer** - Mixed Initiative Prompting with confidence scoring
+- ⏳ **GEPA Optimizer** - Gradient-based prompt optimization
+- ⏳ **GRPO Optimizer** - Group Relative Policy Optimization
+- ⏳ **Retrieve Module** - RAG (Retrieval-Augmented Generation) support
+- ⏳ **Assert/Suggest** - Constraint enforcement and suggestions
+
+#### Infrastructure Improvements (Q2 2025)
+- ⏳ **Test Coverage 100%** - Comprehensive test suite for all modules
+- ⏳ **CI/CD Pipeline** - Automated testing and deployment
+- ⏳ **Performance Monitoring** - MLflow integration and telemetry
+- ⏳ **Documentation Portal** - Interactive docs with live examples
+
+#### Advanced Capabilities (Q2-Q3 2025)
+- ⏳ **Reflexion Module** - Self-reflection and improvement
+- ⏳ **Causal Reasoning** - Advanced causal inference
+- ⏳ **Multi-Modal Support** - Vision and audio model integration
+- ⏳ **Distributed Training** - Multi-node optimization support
+
+#### Community Features (Ongoing)
+- ⏳ **Module Marketplace** - Share and discover community modules
+- ⏳ **Example Gallery** - Curated collection of real-world use cases
+- ⏳ **Interactive Playground** - Browser-based experimentation
+- ⏳ **Video Tutorials** - Step-by-step video guides
+
+**Current Completion**: 75% DSPy Python compliance
+**Target**: 100% by Q3 2025
+
+---
+
 ## 🤝 Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
