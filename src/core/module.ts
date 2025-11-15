@@ -4,7 +4,7 @@ import { Signature, FieldDefinition } from './signature';
  * Base class for DSPy.ts modules.
  * Each module must define a signature and implement the run method.
  */
-export abstract class Module<TInput extends Record<string, any>, TOutput extends Record<string, any>> {
+export abstract class Module<TInput = any, TOutput = any> {
   public readonly name: string;
   public readonly signature: Signature;
   public readonly promptTemplate: (input: TInput) => string;
@@ -34,7 +34,7 @@ export abstract class Module<TInput extends Record<string, any>, TOutput extends
    */
   protected validateInput(input: TInput): void {
     for (const field of this.signature.inputs) {
-      const value = input[field.name];
+      const value = (input as any)[field.name];
 
       // Check required fields
       if (field.required && value === undefined) {
@@ -77,7 +77,7 @@ export abstract class Module<TInput extends Record<string, any>, TOutput extends
    */
   protected validateOutput(output: TOutput): void {
     for (const field of this.signature.outputs) {
-      const value = output[field.name];
+      const value = (output as any)[field.name];
 
       // Check required fields
       if (field.required && value === undefined) {

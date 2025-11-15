@@ -12,10 +12,10 @@ import { getLM } from '../lm';
 /**
  * Chain-of-Thought module that extends predictions with reasoning
  */
-export class ChainOfThought<
-  TInput extends Record<string, any>,
-  TOutput extends Record<string, any>
-> extends Module<TInput, TOutput & { reasoning: string }> {
+export class ChainOfThought<TInput = any, TOutput = any> extends Module<
+  TInput,
+  TOutput & { reasoning: string }
+> {
   /**
    * Create a ChainOfThought module
    * @param config Module configuration with signature
@@ -114,7 +114,7 @@ export class ChainOfThought<
     // Add input fields
     parts.push('Input:');
     for (const field of this.signature.inputs) {
-      const value = input[field.name];
+      const value = (input as any)[field.name];
       if (value !== undefined) {
         parts.push(`${field.name}: ${JSON.stringify(value)}`);
       }

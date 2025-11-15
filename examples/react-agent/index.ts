@@ -4,14 +4,14 @@
  * Demonstrates using the ReAct module for reasoning and acting with tools
  */
 
-import { ReAct, Tool } from '../../src/modules/react';
+import { ReAct, ReActTool } from '../../src/modules/react';
 import { OpenAILM } from '../../src/lm/providers/openai';
 import { configureLM } from '../../src/core';
 
 /**
  * Simple calculator tool
  */
-const calculatorTool: Tool = {
+const calculatorTool: ReActTool = {
   name: 'calculator',
   description: 'Performs basic arithmetic operations. Input format: "5 + 3" or "10 * 2"',
   execute: async (input: string): Promise<string> => {
@@ -29,7 +29,7 @@ const calculatorTool: Tool = {
 /**
  * Wikipedia search tool (mock)
  */
-const wikipediaTool: Tool = {
+const wikipediaTool: ReActTool = {
   name: 'wikipedia',
   description: 'Searches Wikipedia for information. Input: search query',
   execute: async (query: string): Promise<string> => {
@@ -59,7 +59,7 @@ const wikipediaTool: Tool = {
 /**
  * Current time tool
  */
-const timeTool: Tool = {
+const timeTool: ReActTool = {
   name: 'time',
   description: 'Gets the current time and date',
   execute: async (): Promise<string> => {
@@ -139,7 +139,7 @@ async function questionAnsweringExample() {
       for (const step of result.steps) {
         console.log(`  [${step.type.toUpperCase()}] ${step.content}`);
         if (step.tool) {
-          console.log(`    Tool: ${step.tool}`);
+          console.log(`    ReActTool: ${step.tool}`);
         }
       }
       console.log('');
@@ -221,7 +221,7 @@ async function problemSolvingExample() {
     console.log('');
     console.log(`Total Steps: ${result.steps.length}`);
     console.log(
-      `Tool Uses: ${result.steps.filter((s) => s.type === 'action').length}`
+      `ReActTool Uses: ${result.steps.filter((s: any) => s.type === 'action').length}`
     );
   } catch (error) {
     console.error('Error:', error);

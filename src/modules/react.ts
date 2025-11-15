@@ -14,16 +14,16 @@ import { Signature } from '../core/signature';
 import { getLM } from '../lm';
 
 /**
- * Tool that can be used by the ReAct agent
+ * ReActTool that can be used by the ReAct agent
  */
-export interface Tool {
+export interface ReActTool {
   /**
-   * Tool name
+   * ReActTool name
    */
   name: string;
 
   /**
-   * Tool description
+   * ReActTool description
    */
   description: string;
 
@@ -57,7 +57,7 @@ export interface ReActStep {
   content: string;
 
   /**
-   * Tool used (for actions)
+   * ReActTool used (for actions)
    */
   tool?: string;
 
@@ -73,7 +73,7 @@ export interface ReActStep {
 export interface ReActConfig {
   name: string;
   signature: Signature;
-  tools: Tool[];
+  tools: ReActTool[];
   maxIterations?: number;
   strategy?: 'ReAct';
 }
@@ -81,11 +81,11 @@ export interface ReActConfig {
 /**
  * ReAct module for reasoning and acting
  */
-export class ReAct<
-  TInput extends Record<string, any>,
-  TOutput extends Record<string, any>
-> extends Module<TInput, TOutput & { reasoning: string; steps: ReActStep[] }> {
-  private tools: Map<string, Tool>;
+export class ReAct<TInput = any, TOutput = any> extends Module<
+  TInput,
+  TOutput & { reasoning: string; steps: ReActStep[] }
+> {
+  private tools: Map<string, ReActTool>;
   private maxIterations: number;
 
   /**
@@ -260,7 +260,7 @@ export class ReAct<
     // Input
     parts.push('Input:');
     for (const field of this.signature.inputs) {
-      parts.push(`${field.name}: ${JSON.stringify(input[field.name])}`);
+      parts.push(`${field.name}: ${JSON.stringify((input as any)[field.name])}`);
     }
     parts.push('');
 
@@ -302,7 +302,7 @@ export class ReAct<
     parts.push('');
 
     parts.push('Choose a tool and provide input in this format:');
-    parts.push('Tool: <tool_name>');
+    parts.push('ReActTool: <tool_name>');
     parts.push('Input: <input_for_tool>');
 
     return parts.join('\n');
@@ -358,7 +358,7 @@ export class ReAct<
     const tool = this.tools.get(toolName.toLowerCase());
 
     if (!tool) {
-      return `Error: Tool '${toolName}' not found`;
+      return `Error: ReActTool '${toolName}' not found`;
     }
 
     try {

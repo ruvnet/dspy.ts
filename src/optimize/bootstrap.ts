@@ -20,7 +20,7 @@ export interface BootstrapConfig extends OptimizerConfig {
 /**
  * Optimized module with few-shot demonstrations
  */
-class OptimizedModule<TInput extends Record<string, any>, TOutput extends Record<string, any>> extends Module<TInput, TOutput> {
+class OptimizedModule<TInput = any, TOutput = any> extends Module<TInput, TOutput> {
   constructor(
     name: string,
     signature: Signature,
@@ -50,10 +50,7 @@ class OptimizedModule<TInput extends Record<string, any>, TOutput extends Record
 /**
  * BootstrapFewShot optimizer that generates demonstrations using a teacher model
  */
-export class BootstrapFewShot<
-  TInput extends Record<string, any>,
-  TOutput extends Record<string, any>
-> extends Optimizer<TInput, TOutput> {
+export class BootstrapFewShot<TInput = any, TOutput = any> extends Optimizer<TInput, TOutput> {
   protected config: Required<BootstrapConfig>;
   private optimizedProgram: OptimizedModule<TInput, TOutput> | null = null;
 
@@ -73,11 +70,11 @@ export class BootstrapFewShot<
   /**
    * Generate demonstrations using the teacher model
    */
-  private async generateDemonstrations(
-    program: Module<TInput, TOutput>,
-    trainset: TrainingExample<TInput, TOutput>[]
-  ): Promise<TrainingExample<TInput, TOutput>[]> {
-    const demos: TrainingExample<TInput, TOutput>[] = [];
+  private async generateDemonstrations<T1, T2>(
+    program: Module<T1, T2>,
+    trainset: TrainingExample<T1, T2>[]
+  ): Promise<TrainingExample<T1, T2>[]> {
+    const demos: TrainingExample<T1, T2>[] = [];
 
     // First, add labeled examples from trainset
     const labeledDemos = trainset
@@ -96,7 +93,7 @@ export class BootstrapFewShot<
         const output = await program.run(example.input);
 
         // Evaluate the output
-        const score = this.metric(example.input, output);
+        const score = this.metric ? this.metric(example.input as any, output as any) : 1;
         if (score >= this.config.minScore) {
           demos.push({
             input: example.input,
@@ -115,21 +112,31 @@ export class BootstrapFewShot<
   /**
    * Compile a program with bootstrap few-shot optimization
    */
-  async compile(
-    program: Module<TInput, TOutput>,
-    trainset: TrainingExample<TInput, TOutput>[]
-  ): Promise<Module<TInput, TOutput>> {
+  async compile<T1 = TInput, T2 = TOutput>(
+    program: Module<T1, T2>,
+    trainset: TrainingExample<T1, T2>[] | Array<T1 & Partial<T2>>,
+    valset?: TrainingExample<T1, T2>[] | Array<T1 & Partial<T2>>
+  ): Promise<Module<T1, T2>> {
     this.log('Starting bootstrap few-shot optimization');
 
+    // Normalize trainset to TrainingExample format
+    const normalizedTrainset: TrainingExample<T1, T2>[] = (trainset as any[]).map((item: any) => {
+      if ('input' in item) {
+        return item as TrainingExample<T1, T2>;
+      } else {
+        return { input: item, output: undefined } as TrainingExample<T1, T2>;
+      }
+    });
+
     // Generate demonstrations
-    const demos = await this.generateDemonstrations(program, trainset);
+    const demos = await this.generateDemonstrations(program, normalizedTrainset as any);
     this.log(`Generated ${demos.length} demonstrations`);
 
     // Create optimized module by updating prompt template
-    this.optimizedProgram = new OptimizedModule(
+    const optimizedModule = new OptimizedModule<T1, T2>(
       program.name,
       program.signature,
-      (input: TInput) => {
+      (input: T1) => {
         const demoText = demos.map(demo => `Example:
 Input: ${JSON.stringify(demo.input)}
 Expected Output: ${JSON.stringify(demo.output)}`).join('\n\n');
@@ -138,7 +145,8 @@ Expected Output: ${JSON.stringify(demo.output)}`).join('\n\n');
       }
     );
 
-    return this.optimizedProgram;
+    this.optimizedProgram = optimizedModule as any;
+    return optimizedModule;
   }
 
   /**

@@ -134,7 +134,7 @@ interface PredictorOptimization {
  * ```
  */
 export class MIPROv2 extends Optimizer {
-  private config: Required<MIPROv2Config>;
+  private miprov2Config: Required<MIPROv2Config>;
 
   constructor(config: MIPROv2Config) {
     super();
@@ -142,7 +142,7 @@ export class MIPROv2 extends Optimizer {
     // Set defaults based on auto level
     const autoDefaults = this.getAutoDefaults(config.auto || 'medium');
 
-    this.config = {
+    this.miprov2Config = {
       metric: config.metric,
       auto: config.auto || 'medium',
       numCandidates: config.numCandidates || autoDefaults.numCandidates,
@@ -206,11 +206,11 @@ export class MIPROv2 extends Optimizer {
     trainset: Array<TInput & Partial<TOutput>>,
     valset?: Array<TInput & Partial<TOutput>>
   ): Promise<OptimizationResult<TInput, TOutput>> {
-    console.log(`Starting MIPROv2 optimization (${this.config.auto} mode)`);
-    console.log(`- Candidates: ${this.config.numCandidates}`);
-    console.log(`- Bootstrapped demos: ${this.config.maxBootstrappedDemos}`);
-    console.log(`- Labeled demos: ${this.config.maxLabeledDemos}`);
-    console.log(`- Trials: ${this.config.numTrials}`);
+    console.log(`Starting MIPROv2 optimization (${this.miprov2Config.auto} mode)`);
+    console.log(`- Candidates: ${this.miprov2Config.numCandidates}`);
+    console.log(`- Bootstrapped demos: ${this.miprov2Config.maxBootstrappedDemos}`);
+    console.log(`- Labeled demos: ${this.miprov2Config.maxLabeledDemos}`);
+    console.log(`- Trials: ${this.miprov2Config.numTrials}`);
 
     // Step 1: Bootstrap few-shot examples
     console.log('\nStep 1: Bootstrapping few-shot examples...');
@@ -250,7 +250,7 @@ export class MIPROv2 extends Optimizer {
     trainset: Array<TInput & Partial<TOutput>>
   ): Promise<Array<TInput & TOutput>> {
     const demos: Array<TInput & TOutput> = [];
-    const maxDemos = this.config.maxBootstrappedDemos;
+    const maxDemos = this.miprov2Config.maxBootstrappedDemos;
 
     // Sample random examples from training set
     const sampled = this.shuffle(trainset).slice(0, maxDemos * 3); // Sample more than needed
@@ -263,7 +263,7 @@ export class MIPROv2 extends Optimizer {
         const prediction = await program.run(example as TInput);
 
         // Evaluate if it passes the metric
-        const score = await this.config.metric(example, prediction);
+        const score = await this.miprov2Config.metric(example, prediction);
 
         // Only keep good demonstrations (score > 0.5)
         if (score > 0.5) {
@@ -295,7 +295,7 @@ export class MIPROv2 extends Optimizer {
     const taskSummary = this.summarizeTask(program, trainset, demos);
 
     // Generate multiple instruction candidates
-    for (let i = 0; i < this.config.numCandidates; i++) {
+    for (let i = 0; i < this.miprov2Config.numCandidates; i++) {
       try {
         const prompt = this.buildInstructionPrompt(taskSummary, i);
         const response = await lm.generate(prompt, {
@@ -333,22 +333,22 @@ export class MIPROv2 extends Optimizer {
     demos: Array<TInput & TOutput>
   ): Promise<Candidate> {
     const candidates: Candidate[] = [];
-    const evalSet = this.config.minibatch
-      ? this.shuffle(valset).slice(0, this.config.minibatchSize)
+    const evalSet = this.miprov2Config.minibatch
+      ? this.shuffle(valset).slice(0, this.miprov2Config.minibatchSize)
       : valset;
 
     let bestCandidate: Candidate = {
       instruction: instructions[0],
-      demos: demos.slice(0, this.config.maxLabeledDemos),
+      demos: demos.slice(0, this.miprov2Config.maxLabeledDemos),
       score: 0,
     };
 
     // Try different combinations
-    for (let trial = 0; trial < this.config.numTrials; trial++) {
+    for (let trial = 0; trial < this.miprov2Config.numTrials; trial++) {
       // Sample configuration
       const instruction = instructions[trial % instructions.length];
       const numDemos = Math.min(
-        Math.floor(Math.random() * this.config.maxLabeledDemos) + 1,
+        Math.floor(Math.random() * this.miprov2Config.maxLabeledDemos) + 1,
         demos.length
       );
       const selectedDemos = this.shuffle(demos).slice(0, numDemos);
@@ -366,13 +366,13 @@ export class MIPROv2 extends Optimizer {
 
       if (score > bestCandidate.score) {
         bestCandidate = candidate;
-        console.log(`Trial ${trial + 1}/${this.config.numTrials}: New best score ${score.toFixed(4)}`);
+        console.log(`Trial ${trial + 1}/${this.miprov2Config.numTrials}: New best score ${score.toFixed(4)}`);
       }
 
       // Periodic full evaluation
       if (
-        this.config.minibatch &&
-        (trial + 1) % this.config.minibatchFullEvalSteps === 0
+        this.miprov2Config.minibatch &&
+        (trial + 1) % this.miprov2Config.minibatchFullEvalSteps === 0
       ) {
         const fullScore = await this.evaluateConfig(
           program,
@@ -385,7 +385,7 @@ export class MIPROv2 extends Optimizer {
     }
 
     // Final full evaluation
-    if (this.config.minibatch && evalSet.length < valset.length) {
+    if (this.miprov2Config.minibatch && evalSet.length < valset.length) {
       console.log('\nRunning final full evaluation...');
       bestCandidate.score = await this.evaluateConfig(
         program,
@@ -416,7 +416,7 @@ export class MIPROv2 extends Optimizer {
         const prediction = await program.run(example as TInput);
 
         // Evaluate
-        const score = await this.config.metric(example, prediction);
+        const score = await this.miprov2Config.metric(example, prediction);
         totalScore += score;
         count++;
       } catch (error) {
