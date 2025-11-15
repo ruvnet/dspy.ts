@@ -64,7 +64,11 @@ export function configureLM(lm: LMDriver): void {
 
 /**
  * Get the global language model
+ * @throws {LMError} if no LM is configured
  */
-export function getLM(): LMDriver | null {
+export function getLM(): LMDriver {
+  if (!globalLM) {
+    throw new LMError('No language model configured. Call configureLM() first.');
+  }
   return globalLM;
 }

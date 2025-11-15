@@ -32,13 +32,23 @@ export interface TrainingExample<TInput = any, TOutput = any> {
 }
 
 /**
+ * Optimization result
+ */
+export interface OptimizationResult<TInput = any, TOutput = any> {
+  program: Module<TInput, TOutput>;
+  score: number;
+  config?: any;
+  metadata?: Record<string, any>;
+}
+
+/**
  * Base class for all DSPy.ts optimizers
  */
 export abstract class Optimizer<TInput = any, TOutput = any> {
-  protected config: Required<OptimizerConfig>;
-  protected metric: MetricFunction<TInput, TOutput>;
+  protected config?: Required<OptimizerConfig>;
+  protected metric?: MetricFunction<TInput, TOutput>;
 
-  constructor(metric: MetricFunction<TInput, TOutput>, config: OptimizerConfig = {}) {
+  constructor(metric?: MetricFunction<TInput, TOutput>, config: OptimizerConfig = {}) {
     this.metric = metric;
     this.config = {
       maxIterations: 10,
@@ -51,23 +61,24 @@ export abstract class Optimizer<TInput = any, TOutput = any> {
   /**
    * Compile a program or module with optimization
    */
-  abstract compile(
-    program: Module<any, any> | Pipeline,
-    trainset: TrainingExample<TInput, TOutput>[]
-  ): Promise<Module<any, any> | Pipeline>;
+  abstract compile<T1 = TInput, T2 = TOutput>(
+    program: Module<T1, T2>,
+    trainset: TrainingExample<T1, T2>[] | Array<T1 & Partial<T2>>,
+    valset?: TrainingExample<T1, T2>[] | Array<T1 & Partial<T2>>
+  ): Promise<Module<T1, T2> | OptimizationResult<T1, T2>>;
 
   /**
-   * Save the optimized program to a file
+   * Save the optimized program to a file (optional)
    */
-  abstract save(path: string, saveFieldMeta?: boolean): void;
+  save?(path: string, saveFieldMeta?: boolean): void;
 
   /**
-   * Load an optimized program from a file
+   * Load an optimized program from a file (optional)
    */
-  abstract load(path: string): void;
+  load?(path: string): void;
 
   protected log(message: string) {
-    if (this.config.debug) {
+    if (this.config && this.config.debug) {
       console.log(`[Optimizer] ${message}`);
     }
   }

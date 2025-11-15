@@ -1,27 +1,54 @@
-import { LMDriver, LMError } from './lm/base';
-import { DummyLM } from './lm/dummy';
-
-// Global variable to hold the LM driver
-let globalLM: LMDriver | null = null;
-
 /**
- * Configure the global language model driver
+ * DSPy.ts - TypeScript implementation of Stanford's DSPy framework
+ *
+ * A declarative framework for building modular AI software that automatically
+ * compiles programs into effective prompts and weights for language models.
+ *
+ * @version 2.1.0
+ * @author rUv
+ * @license MIT
  */
-export function configureLM(lm: LMDriver): void {
-  globalLM = lm;
-}
 
-/**
- * Get the currently configured LM driver
- * @throws {LMError} if no LM is configured
- */
-export function getLM(): LMDriver {
-  if (!globalLM) {
-    throw new LMError('No language model configured. Call configureLM() first.');
-  }
-  return globalLM;
-}
+// Core exports
+export * from './core';
 
-// Export LM-related types and implementations
-export { LMDriver, GenerationOptions, LMError } from './lm/base';
-export { DummyLM } from './lm/dummy';
+// LM exports
+export * from './lm/base';
+export * from './lm/dummy';
+export * from './lm/providers';
+
+// Module exports
+export * from './modules';
+
+// Optimizer exports
+export * from './optimize/base';
+export * from './optimize/bootstrap';
+export * from './optimize/mipro-v2';
+
+// Memory exports
+export * from './memory';
+
+// Agent exports
+export * from './agent';
+
+// Metrics exports
+export { type MetricFunction as EvaluationMetric } from './metrics';
+export {
+  exactMatch,
+  f1Score,
+  answerSimilarity,
+  contains,
+  semanticSimilarity,
+  passAtK,
+  meanReciprocalRank,
+  bleuScore,
+  rougeL,
+  accuracy,
+  createMetric,
+  combinedMetric,
+  evaluate,
+} from './metrics';
+
+// Legacy global LM configuration (for backwards compatibility)
+import { configureLM as coreConfigure, getLM as coreGetLM } from './lm/base';
+export { coreConfigure as configureLM, coreGetLM as getLM };
