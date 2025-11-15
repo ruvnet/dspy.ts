@@ -685,6 +685,46 @@ const result = await extractor.run({
 // Automatically extracts structured data
 ```
 
+### Interactive CLI Demos
+
+DSPy.ts includes 6 comprehensive CLI demos showcasing all major features. Run them with OpenRouter for access to multiple LLM providers:
+
+```bash
+# Set up your OpenRouter API key
+export OPENROUTER_API_KEY="your-key-here"
+
+# Run the interactive demo menu
+cd examples/cli
+npx ts-node demo-runner.ts
+
+# Or run specific demos
+npx ts-node demo-runner.ts simple-qa
+npx ts-node demo-runner.ts rag-agentdb
+npx ts-node demo-runner.ts reasoning-bank
+npx ts-node demo-runner.ts multi-agent
+npx ts-node demo-runner.ts optimization
+npx ts-node demo-runner.ts program-of-thought
+
+# Use different models
+MODEL=anthropic/claude-3-opus npx ts-node demo-runner.ts simple-qa
+```
+
+**Available Demos:**
+
+1. **Simple Q&A** (`simple-qa`) - Chain-of-Thought reasoning with step-by-step explanations
+2. **RAG with AgentDB** (`rag-agentdb`) - Retrieval-Augmented Generation with 150x faster vector search
+3. **ReasoningBank Learning** (`reasoning-bank`) - Self-learning system with SAFLA algorithm
+4. **Multi-Agent Swarm** (`multi-agent`) - Orchestrated agents with intelligent handoffs
+5. **MIPROv2 Optimization** (`optimization`) - Automatic prompt optimization with Bayesian methods
+6. **Program-of-Thought** (`program-of-thought`) - Code generation and sandboxed execution for precise calculations
+
+Each demo includes:
+- ✅ Complete working code
+- ✅ Detailed console output with formatting
+- ✅ Error handling and best practices
+- ✅ Multiple test cases
+- ✅ Feature explanations
+
 More examples in the [examples/](examples/) directory!
 
 ---

@@ -1,6 +1,6 @@
 {
   "name": "dspy.ts",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "DSPy.ts 2.1 - 100% DSPy Python compliant TypeScript framework with multi-agent orchestration, self-learning capabilities, MIPROv2 optimizer, and comprehensive module library. Powered by AgentDB, ReasoningBank, and Swarm architecture.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,7 +20,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run test "prepublishOnly": "npm run build""prepublishOnly": "npm run build" npm run build",
+    "prepublishOnly": "npm run build",
     "docs": "typedoc --out docs/api src/index.ts",
     "clean": "rm -rf dist coverage"
   },
