@@ -206,6 +206,156 @@ export interface SAFLAConfig {
    * Evolution interval in milliseconds
    */
   evolutionInterval: number;
+
+  /**
+   * Meta-learning configuration
+   */
+  metaLearning: MetaLearningConfig;
+
+  /**
+   * Intelligence optimization settings
+   */
+  intelligenceOptimization: IntelligenceOptimizationConfig;
+}
+
+/**
+ * Meta-learning configuration for learning how to learn
+ */
+export interface MetaLearningConfig {
+  /**
+   * Enable meta-learning capabilities
+   */
+  enabled: boolean;
+
+  /**
+   * Learning rate adaptation strategy
+   */
+  adaptiveLearningRate: boolean;
+
+  /**
+   * Curriculum learning - order experiences by difficulty
+   */
+  curriculumLearning: boolean;
+
+  /**
+   * Few-shot learning threshold (min examples needed)
+   */
+  fewShotThreshold: number;
+
+  /**
+   * Transfer learning across domains
+   */
+  crossDomainTransfer: boolean;
+}
+
+/**
+ * Intelligence optimization configuration
+ */
+export interface IntelligenceOptimizationConfig {
+  /**
+   * Enable continuous optimization
+   */
+  enabled: boolean;
+
+  /**
+   * Reasoning depth optimization
+   */
+  reasoningDepthOptimization: boolean;
+
+  /**
+   * Pattern abstraction level (1-5)
+   */
+  abstractionLevel: number;
+
+  /**
+   * Causal inference strength
+   */
+  causalInferenceStrength: number;
+
+  /**
+   * Analogical reasoning weight
+   */
+  analogicalReasoningWeight: number;
+
+  /**
+   * Self-critique intensity (0-1)
+   */
+  selfCritiqueIntensity: number;
+}
+
+/**
+ * Intelligence metrics for tracking cognitive capabilities
+ */
+export interface IntelligenceMetrics {
+  /**
+   * Overall intelligence score (0-100)
+   */
+  overallScore: number;
+
+  /**
+   * Reasoning accuracy
+   */
+  reasoningAccuracy: number;
+
+  /**
+   * Learning efficiency (knowledge gained per experience)
+   */
+  learningEfficiency: number;
+
+  /**
+   * Adaptation speed (how quickly it adjusts to new domains)
+   */
+  adaptationSpeed: number;
+
+  /**
+   * Transfer capability (success rate in new domains)
+   */
+  transferCapability: number;
+
+  /**
+   * Pattern recognition depth
+   */
+  patternRecognitionDepth: number;
+
+  /**
+   * Self-improvement rate
+   */
+  selfImprovementRate: number;
+
+  /**
+   * Timestamp of measurement
+   */
+  measuredAt: Date;
+}
+
+/**
+ * Optimization result from intelligence enhancement
+ */
+export interface OptimizationResult {
+  /**
+   * Before metrics
+   */
+  before: IntelligenceMetrics;
+
+  /**
+   * After metrics
+   */
+  after: IntelligenceMetrics;
+
+  /**
+   * Improvements made
+   */
+  improvements: string[];
+
+  /**
+   * Optimization strategies applied
+   */
+  strategiesApplied: string[];
+
+  /**
+   * Time taken in milliseconds
+   */
+  durationMs: number;
 }
 
 /**
