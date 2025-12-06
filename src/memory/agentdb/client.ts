@@ -18,6 +18,73 @@ import {
 } from './types';
 import { RuVectorClient } from '../ruvector/client';
 
+// ============================================================================
+// Circuit Breaker State
+// ============================================================================
+
+interface CircuitBreakerState {
+  failures: number;
+  lastFailure: number;
+  state: 'closed' | 'open' | 'half-open';
+  successCount: number;
+}
+
+// ============================================================================
+// LRU Cache with Selective Invalidation
+// ============================================================================
+
+class AgentDBCache<K, V> {
+  private cache: Map<K, { value: V; timestamp: number; hash: number }> = new Map();
+  private maxSize: number;
+  private ttlMs: number;
+
+  constructor(maxSize: number = 1000, ttlMs: number = 300000) {
+    this.maxSize = maxSize;
+    this.ttlMs = ttlMs;
+  }
+
+  get(key: K): V | undefined {
+    const entry = this.cache.get(key);
+    if (!entry) return undefined;
+
+    if (Date.now() - entry.timestamp > this.ttlMs) {
+      this.cache.delete(key);
+      return undefined;
+    }
+
+    // Move to front (LRU)
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+    return entry.value;
+  }
+
+  set(key: K, value: V, vectorHash: number): void {
+    if (this.cache.size >= this.maxSize) {
+      // Remove oldest entry
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, { value, timestamp: Date.now(), hash: vectorHash });
+  }
+
+  invalidateByVectorHash(hash: number, tolerance: number = 100): void {
+    // Selective invalidation - only invalidate entries whose hash is close
+    for (const [key, entry] of this.cache.entries()) {
+      if (Math.abs(entry.hash - hash) < tolerance) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  get size(): number {
+    return this.cache.size;
+  }
+}
+
 export class AgentDBClient {
   private config: AgentDBConfig;
   private logger: pino.Logger;
@@ -25,7 +92,7 @@ export class AgentDBClient {
   private db: any; // AgentDB instance
   private ruVectorClient: RuVectorClient | null = null;
   private useRuVector: boolean = false;
-  private cache: Map<string, SearchResult[]> = new Map();
+  private cache: AgentDBCache<string, SearchResult[]>;
   private stats: AgentDBStats = {
     totalVectors: 0,
     indexSize: 0,
@@ -35,12 +102,108 @@ export class AgentDBClient {
     cacheHitRate: 0,
   };
 
+  // Circuit breaker for RuVector
+  private circuitBreaker: CircuitBreakerState = {
+    failures: 0,
+    lastFailure: 0,
+    state: 'closed',
+    successCount: 0,
+  };
+  private readonly CIRCUIT_BREAKER_THRESHOLD = 5;
+  private readonly CIRCUIT_BREAKER_TIMEOUT = 30000; // 30 seconds
+  private readonly CIRCUIT_BREAKER_SUCCESS_THRESHOLD = 3;
+
+  // Improved stats tracking
+  private cacheHits: number = 0;
+  private cacheMisses: number = 0;
+  private latencyHistory: number[] = [];
+  private readonly MAX_LATENCY_SAMPLES = 100;
+
+  // Stats caching
+  private cachedStats: (AgentDBStats & { ruVectorEnabled: boolean; implementation?: string }) | null = null;
+  private statsCacheTime: number = 0;
+  private readonly STATS_CACHE_TTL = 10000; // 10 seconds
+
   constructor(config?: Partial<AgentDBConfig>) {
     this.config = mergeConfig(config || {});
     this.logger = pino({
       level: process.env.LOG_LEVEL || 'info',
       name: 'agentdb-client',
     });
+    this.cache = new AgentDBCache(
+      this.config.performance?.cacheSize || 1000,
+      300000 // 5 minute TTL
+    );
+  }
+
+  // ============================================================================
+  // Circuit Breaker Methods
+  // ============================================================================
+
+  private shouldUseRuVector(): boolean {
+    if (!this.useRuVector || !this.ruVectorClient) return false;
+
+    const now = Date.now();
+
+    switch (this.circuitBreaker.state) {
+      case 'closed':
+        return true;
+
+      case 'open':
+        // Check if timeout has passed
+        if (now - this.circuitBreaker.lastFailure > this.CIRCUIT_BREAKER_TIMEOUT) {
+          this.circuitBreaker.state = 'half-open';
+          this.circuitBreaker.successCount = 0;
+          this.logger.info('Circuit breaker transitioning to half-open');
+          return true;
+        }
+        return false;
+
+      case 'half-open':
+        return true;
+    }
+  }
+
+  private recordRuVectorSuccess(): void {
+    if (this.circuitBreaker.state === 'half-open') {
+      this.circuitBreaker.successCount++;
+      if (this.circuitBreaker.successCount >= this.CIRCUIT_BREAKER_SUCCESS_THRESHOLD) {
+        this.circuitBreaker.state = 'closed';
+        this.circuitBreaker.failures = 0;
+        this.logger.info('Circuit breaker closed - RuVector recovered');
+      }
+    } else {
+      this.circuitBreaker.failures = 0;
+    }
+  }
+
+  private recordRuVectorFailure(): void {
+    this.circuitBreaker.failures++;
+    this.circuitBreaker.lastFailure = Date.now();
+
+    if (this.circuitBreaker.state === 'half-open') {
+      this.circuitBreaker.state = 'open';
+      this.logger.warn('Circuit breaker re-opened - RuVector still failing');
+    } else if (this.circuitBreaker.failures >= this.CIRCUIT_BREAKER_THRESHOLD) {
+      this.circuitBreaker.state = 'open';
+      this.logger.warn('Circuit breaker opened - falling back to AgentDB', {
+        failures: this.circuitBreaker.failures,
+      });
+    }
+  }
+
+  // ============================================================================
+  // Fast Hash Function (FNV-1a)
+  // ============================================================================
+
+  private hashVector(vector: number[]): number {
+    let hash = 2166136261;
+    for (let i = 0; i < vector.length; i++) {
+      const bits = Math.round(vector[i] * 1e6);
+      hash ^= bits;
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
   }
 
   /**
@@ -153,22 +316,38 @@ export class AgentDBClient {
         updatedAt: now,
       };
 
-      // Use RuVector for high-performance operations
-      if (this.useRuVector && this.ruVectorClient) {
-        await retry(
-          async () => {
-            await this.ruVectorClient!.insert({
-              id,
-              vector,
-              metadata: { ...metadata, createdAt: now.toISOString(), updatedAt: now.toISOString() },
-            });
-          },
-          {
-            retries: 3,
-            minTimeout: 100,
-            maxTimeout: 1000,
-          }
-        );
+      // Use RuVector for high-performance operations (with circuit breaker)
+      if (this.shouldUseRuVector()) {
+        try {
+          await retry(
+            async () => {
+              await this.ruVectorClient!.insert({
+                id,
+                vector,
+                metadata: { ...metadata, createdAt: now.toISOString(), updatedAt: now.toISOString() },
+              });
+            },
+            {
+              retries: 2, // Fewer retries for inserts
+              minTimeout: 50,
+              maxTimeout: 500,
+            }
+          );
+          this.recordRuVectorSuccess();
+        } catch (ruVectorError) {
+          this.recordRuVectorFailure();
+          // Fall back to AgentDB
+          await retry(
+            async () => {
+              await this.db.insert(id, vector, metadata);
+            },
+            {
+              retries: 3,
+              minTimeout: 100,
+              maxTimeout: 1000,
+            }
+          );
+        }
       } else {
         await retry(
           async () => {
@@ -183,7 +362,10 @@ export class AgentDBClient {
       }
 
       this.stats.totalVectors++;
-      this.invalidateCache();
+      // Selective cache invalidation based on vector hash
+      const vectorHash = this.hashVector(vector);
+      this.cache.invalidateByVectorHash(vectorHash);
+      this.invalidateStatsCache();
 
       this.logger.debug('Vector stored', { id, metadataKeys: Object.keys(metadata), useRuVector: this.useRuVector });
       return id;
@@ -211,12 +393,12 @@ export class AgentDBClient {
       metric = 'cosine',
     } = options;
 
-    // Check cache
+    // Check cache (using fast hash-based key)
     const cacheKey = this.getCacheKey(query, options);
     const cached = this.cache.get(cacheKey);
     if (cached) {
       this.stats.totalSearches++;
-      this.updateCacheHitRate(true);
+      this.cacheHits++;
       return cached;
     }
 
@@ -225,80 +407,58 @@ export class AgentDBClient {
 
       let searchResults: SearchResult[];
 
-      // Use RuVector for high-performance search
-      if (this.useRuVector && this.ruVectorClient) {
-        const results = await retry(
-          async () => {
-            return await this.ruVectorClient!.search({
-              vector: query,
-              k,
-              filter: Object.keys(filter).length > 0 ? filter : undefined,
-              threshold: minScore,
-            });
-          },
-          {
-            retries: 3,
-            minTimeout: 100,
-            maxTimeout: 1000,
-          }
-        );
+      const vectorHash = this.hashVector(query);
 
-        // Transform RuVector results to SearchResult format
-        searchResults = results.map((r) => ({
-          id: r.id,
-          score: r.score,
-          distance: 1 - r.score,
-          data: {
-            id: r.id,
-            vector: includeVectors ? r.vector : [],
-            metadata: r.metadata || {},
-            createdAt: r.metadata?.createdAt ? new Date(r.metadata.createdAt) : new Date(),
-            updatedAt: r.metadata?.updatedAt ? new Date(r.metadata.updatedAt) : new Date(),
-          },
-        }));
-      } else {
-        const results = await retry(
-          async () => {
-            return await this.db.search(query, {
-              k,
-              metric,
-              filter: Object.keys(filter).length > 0 ? filter : undefined,
-            });
-          },
-          {
-            retries: 3,
-            minTimeout: 100,
-            maxTimeout: 1000,
-          }
-        );
+      // Use RuVector for high-performance search (with circuit breaker)
+      if (this.shouldUseRuVector()) {
+        try {
+          const results = await retry(
+            async () => {
+              return await this.ruVectorClient!.search({
+                vector: query,
+                k,
+                filter: Object.keys(filter).length > 0 ? filter : undefined,
+                threshold: minScore,
+              });
+            },
+            {
+              retries: 3,
+              minTimeout: 200, // Longer timeout for search
+              maxTimeout: 2000,
+            }
+          );
+          this.recordRuVectorSuccess();
 
-        // Transform results
-        searchResults = results
-          .map((r: any) => ({
+          // Transform RuVector results to SearchResult format
+          searchResults = results.map((r) => ({
             id: r.id,
             score: r.score,
-            distance: r.distance,
+            distance: 1 - r.score,
             data: {
               id: r.id,
               vector: includeVectors ? r.vector : [],
               metadata: r.metadata || {},
-              createdAt: r.createdAt || new Date(),
-              updatedAt: r.updatedAt || new Date(),
+              createdAt: r.metadata?.createdAt ? new Date(r.metadata.createdAt) : new Date(),
+              updatedAt: r.metadata?.updatedAt ? new Date(r.metadata.updatedAt) : new Date(),
             },
-          }))
-          .filter((r: SearchResult) => r.score >= minScore);
+          }));
+        } catch (ruVectorError) {
+          this.recordRuVectorFailure();
+          // Fall back to AgentDB search
+          searchResults = await this.fallbackSearch(query, k, minScore, filter, includeVectors, metric);
+        }
+      } else {
+        searchResults = await this.fallbackSearch(query, k, minScore, filter, includeVectors, metric);
       }
 
       // Update stats
       const latency = Date.now() - startTime;
       this.updateSearchStats(latency);
 
-      // Cache results
-      if (this.cache.size < this.config.performance.cacheSize) {
-        this.cache.set(cacheKey, searchResults);
-      }
+      // Cache results with vector hash for selective invalidation
+      this.cache.set(cacheKey, searchResults, vectorHash);
 
-      this.updateCacheHitRate(false);
+      this.cacheMisses++;
       this.logger.debug('Search completed', {
         resultsCount: searchResults.length,
         latency,
@@ -337,7 +497,8 @@ export class AgentDBClient {
         }
       );
 
-      this.invalidateCache();
+      this.cache.clear(); // Full clear on update for safety
+      this.invalidateStatsCache();
       this.logger.debug('Vector updated', { id });
     } catch (error) {
       this.logger.error('Failed to update vector', { id, error });
@@ -364,7 +525,8 @@ export class AgentDBClient {
       );
 
       this.stats.totalVectors--;
-      this.invalidateCache();
+      this.cache.clear(); // Full clear on delete for safety
+      this.invalidateStatsCache();
       this.logger.debug('Vector deleted', { id });
     } catch (error) {
       this.logger.error('Failed to delete vector', { id, error });
@@ -373,10 +535,11 @@ export class AgentDBClient {
   }
 
   /**
-   * Batch store vectors
+   * Batch store vectors (with parallel processing)
    */
   async batchStore(
-    vectors: Array<{ vector: number[]; metadata?: Record<string, any> }>
+    vectors: Array<{ vector: number[]; metadata?: Record<string, any> }>,
+    options: { concurrency?: number } = {}
   ): Promise<BatchResult<string>> {
     this.ensureInitialized();
 
@@ -384,38 +547,82 @@ export class AgentDBClient {
       throw new Error('Batch operations are disabled');
     }
 
+    const { concurrency = 10 } = options;
     const success: string[] = [];
     const failed: Array<{ index: number; error: Error }> = [];
 
-    for (let i = 0; i < vectors.length; i++) {
-      try {
-        const id = await this.store(vectors[i].vector, vectors[i].metadata);
-        success.push(id);
-      } catch (error) {
-        failed.push({ index: i, error: error as Error });
+    // Process in batches for controlled parallelism
+    for (let i = 0; i < vectors.length; i += concurrency) {
+      const batch = vectors.slice(i, i + concurrency);
+      const batchPromises = batch.map(async (v, batchIndex): Promise<
+        | { success: true; id: string; index: number }
+        | { success: false; error: Error; index: number }
+      > => {
+        const globalIndex = i + batchIndex;
+        try {
+          const id = await this.store(v.vector, v.metadata);
+          return { success: true, id, index: globalIndex };
+        } catch (error) {
+          return { success: false, error: error as Error, index: globalIndex };
+        }
+      });
+
+      const results = await Promise.all(batchPromises);
+
+      for (const result of results) {
+        if (result.success) {
+          success.push(result.id);
+        } else {
+          failed.push({ index: result.index, error: result.error });
+        }
       }
     }
 
     this.logger.info('Batch store completed', {
       success: success.length,
       failed: failed.length,
+      parallelism: concurrency,
     });
 
     return { success, failed };
   }
 
   /**
-   * Get statistics
+   * Get statistics (with caching)
    */
-  getStats(): AgentDBStats & { ruVectorEnabled: boolean; implementation?: string } {
-    const baseStats = { ...this.stats };
-    return {
-      ...baseStats,
+  getStats(): AgentDBStats & { ruVectorEnabled: boolean; implementation?: string; circuitBreakerState?: string } {
+    const now = Date.now();
+
+    // Return cached stats if still valid
+    if (this.cachedStats && now - this.statsCacheTime < this.STATS_CACHE_TTL) {
+      return this.cachedStats;
+    }
+
+    // Compute accurate cache hit rate
+    const totalCacheOps = this.cacheHits + this.cacheMisses;
+    const cacheHitRate = totalCacheOps > 0 ? this.cacheHits / totalCacheOps : 0;
+
+    // Compute average latency from recent samples
+    const avgLatency = this.latencyHistory.length > 0
+      ? this.latencyHistory.reduce((a, b) => a + b, 0) / this.latencyHistory.length
+      : 0;
+
+    const stats = {
+      ...this.stats,
+      cacheHitRate,
+      avgSearchLatency: avgLatency,
       ruVectorEnabled: this.useRuVector,
       implementation: this.useRuVector && this.ruVectorClient
         ? this.ruVectorClient.getImplementationType()
         : 'fallback',
+      circuitBreakerState: this.circuitBreaker.state,
     };
+
+    // Cache the computed stats
+    this.cachedStats = stats;
+    this.statsCacheTime = now;
+
+    return stats;
   }
 
   /**
@@ -528,36 +735,89 @@ export class AgentDBClient {
   }
 
   /**
-   * Get cache key for search
+   * Get cache key for search (using fast FNV-1a hash)
    */
   private getCacheKey(query: number[], options: SearchOptions): string {
-    return JSON.stringify({ query, options });
+    const vectorHash = this.hashVector(query);
+    const optionsHash = this.hashOptions(options);
+    return `${vectorHash.toString(16)}_${optionsHash.toString(16)}`;
   }
 
   /**
-   * Invalidate cache
+   * Hash search options
    */
-  private invalidateCache(): void {
-    this.cache.clear();
+  private hashOptions(options: SearchOptions): number {
+    let hash = 2166136261;
+    const str = `${options.k || 10}_${options.minScore || 0}_${options.metric || 'cosine'}`;
+    for (let i = 0; i < str.length; i++) {
+      hash ^= str.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
   }
 
   /**
-   * Update search statistics
+   * Invalidate stats cache
+   */
+  private invalidateStatsCache(): void {
+    this.cachedStats = null;
+  }
+
+  /**
+   * Update search statistics with rolling window
    */
   private updateSearchStats(latency: number): void {
     this.stats.totalSearches++;
-    this.stats.avgSearchLatency =
-      (this.stats.avgSearchLatency * (this.stats.totalSearches - 1) + latency) /
-      this.stats.totalSearches;
+
+    // Use rolling window for latency
+    this.latencyHistory.push(latency);
+    if (this.latencyHistory.length > this.MAX_LATENCY_SAMPLES) {
+      this.latencyHistory.shift();
+    }
+
+    this.invalidateStatsCache();
   }
 
   /**
-   * Update cache hit rate
+   * Fallback search using AgentDB or in-memory storage
    */
-  private updateCacheHitRate(hit: boolean): void {
-    const total = this.stats.totalSearches;
-    const currentHits = this.stats.cacheHitRate * (total - 1);
-    this.stats.cacheHitRate = (currentHits + (hit ? 1 : 0)) / total;
+  private async fallbackSearch(
+    query: number[],
+    k: number,
+    minScore: number,
+    filter: Record<string, any>,
+    includeVectors: boolean,
+    metric: string
+  ): Promise<SearchResult[]> {
+    const results = await retry(
+      async () => {
+        return await this.db.search(query, {
+          k,
+          metric,
+          filter: Object.keys(filter).length > 0 ? filter : undefined,
+        });
+      },
+      {
+        retries: 3,
+        minTimeout: 100,
+        maxTimeout: 1000,
+      }
+    );
+
+    return results
+      .map((r: any) => ({
+        id: r.id,
+        score: r.score,
+        distance: r.distance,
+        data: {
+          id: r.id,
+          vector: includeVectors ? r.vector : [],
+          metadata: r.metadata || {},
+          createdAt: r.createdAt || new Date(),
+          updatedAt: r.updatedAt || new Date(),
+        },
+      }))
+      .filter((r: SearchResult) => r.score >= minScore);
   }
 
   /**

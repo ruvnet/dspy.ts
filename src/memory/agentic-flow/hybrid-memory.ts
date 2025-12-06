@@ -2,10 +2,12 @@
  * Hybrid Memory System
  *
  * Integrates agentic-flow's advanced memory capabilities with DSPy.ts
+ * Optimized with shared embedding service and stats caching
  */
 
 import pino from 'pino';
 import { RuVectorClient } from '../ruvector/client';
+import { EmbeddingService, getEmbeddingService } from '../embedding-service';
 import {
   AgenticPatternData,
   AgenticRetrievalOptions,
@@ -16,6 +18,15 @@ import {
   DEFAULT_AGENTIC_FLOW_CONFIG,
 } from './types';
 
+// Stats cache type
+interface CachedStats {
+  totalPatterns: number;
+  avgConfidence: number;
+  ruVectorEnabled: boolean;
+  reasoningBankEnabled: boolean;
+  embeddingCacheStats?: any;
+}
+
 export class HybridMemorySystem {
   private logger: pino.Logger;
   private config: AgenticFlowConfig;
@@ -24,6 +35,16 @@ export class HybridMemorySystem {
   private advancedMemory: any = null;
   private initialized: boolean = false;
   private patterns: Map<string, AgenticPatternData> = new Map();
+  private embeddingService: EmbeddingService | null = null;
+
+  // Stats caching
+  private cachedStats: CachedStats | null = null;
+  private statsCacheTime: number = 0;
+  private readonly STATS_CACHE_TTL = 10000; // 10 seconds
+
+  // Running stats for incremental updates
+  private totalConfidence: number = 0;
+  private patternCount: number = 0;
 
   constructor(config?: Partial<AgenticFlowConfig>) {
     this.config = { ...DEFAULT_AGENTIC_FLOW_CONFIG, ...config };
@@ -44,6 +65,14 @@ export class HybridMemorySystem {
 
     try {
       this.logger.info('Initializing hybrid memory system', this.config);
+
+      // Initialize shared embedding service
+      this.embeddingService = getEmbeddingService({
+        dimension: this.config.embeddingDimension,
+        cacheSize: 10000,
+        cacheTtlMs: 3600000, // 1 hour
+      });
+      this.logger.info('Embedding service initialized');
 
       // Initialize RuVector for high-performance vector operations
       try {
@@ -96,34 +125,80 @@ export class HybridMemorySystem {
       updatedAt: now,
     };
 
-    // Store in local map
-    this.patterns.set(id, patternData);
+    // Update running stats
+    this.totalConfidence += pattern.confidence;
+    this.patternCount++;
+    this.invalidateStatsCache();
 
-    // Store in vector database for semantic search
-    if (this.vectorClient) {
-      const embedding = await this.computeEmbedding(pattern.pattern);
-      await this.vectorClient.insert({
-        id,
-        vector: embedding,
-        metadata: {
-          type: 'pattern',
-          ...patternData,
-        },
-      });
-    }
+    // Use optimized storage strategy
+    const { storageStrategy, storagePriority, parallelStorageWrites } = this.config;
 
-    // Store in agentic-flow reasoningbank if available
-    if (this.reasoningBank && this.reasoningBank.db) {
-      try {
-        await this.reasoningBank.db.insertPattern({
+    // Define storage operations
+    const storeLocal = () => {
+      this.patterns.set(id, patternData);
+    };
+
+    const storeVector = async () => {
+      if (this.vectorClient) {
+        const embedding = await this.computeEmbedding(pattern.pattern);
+        await this.vectorClient.insert({
           id,
-          pattern: pattern.pattern,
-          context: JSON.stringify(pattern.context),
-          success: pattern.success,
-          confidence: pattern.confidence,
+          vector: embedding,
+          metadata: {
+            type: 'pattern',
+            ...patternData,
+          },
         });
-      } catch (error) {
-        this.logger.warn('Failed to store in reasoningbank', { error });
+      }
+    };
+
+    const storeReasoningBank = async () => {
+      if (this.reasoningBank && this.reasoningBank.db) {
+        try {
+          await this.reasoningBank.db.insertPattern({
+            id,
+            pattern: pattern.pattern,
+            context: JSON.stringify(pattern.context),
+            success: pattern.success,
+            confidence: pattern.confidence,
+          });
+        } catch (error) {
+          this.logger.warn('Failed to store in reasoningbank', { error });
+        }
+      }
+    };
+
+    const storageOps: Record<string, () => Promise<void> | void> = {
+      local: storeLocal,
+      vector: storeVector,
+      reasoningBank: storeReasoningBank,
+    };
+
+    // Execute based on strategy
+    if (storageStrategy === 'all') {
+      // Original behavior: write to all stores
+      if (parallelStorageWrites) {
+        await Promise.all([storeLocal(), storeVector(), storeReasoningBank()]);
+      } else {
+        storeLocal();
+        await storeVector();
+        await storeReasoningBank();
+      }
+    } else if (storageStrategy === 'primary-only') {
+      // Write only to primary store
+      await storageOps[storagePriority.primary]();
+    } else {
+      // primary-with-backup: write to primary and backup
+      if (parallelStorageWrites && storagePriority.backup) {
+        await Promise.all([
+          storageOps[storagePriority.primary](),
+          storageOps[storagePriority.backup](),
+        ]);
+      } else {
+        await storageOps[storagePriority.primary]();
+        if (storagePriority.backup) {
+          await storageOps[storagePriority.backup]();
+        }
       }
     }
 
@@ -299,35 +374,55 @@ export class HybridMemorySystem {
         if (this.vectorClient) {
           await this.vectorClient.delete(id);
         }
+        // Update running stats
+        this.totalConfidence -= pattern.confidence;
+        this.patternCount--;
         removed++;
       } else {
         consolidated++;
       }
     }
 
+    this.invalidateStatsCache();
     return { consolidated, removed };
   }
 
   /**
-   * Get system statistics
+   * Get system statistics (with caching)
    */
-  getStats(): {
-    totalPatterns: number;
-    avgConfidence: number;
-    ruVectorEnabled: boolean;
-    reasoningBankEnabled: boolean;
-  } {
-    const patterns = Array.from(this.patterns.values());
-    const avgConfidence = patterns.length > 0
-      ? patterns.reduce((sum, p) => sum + p.confidence, 0) / patterns.length
+  getStats(): CachedStats {
+    const now = Date.now();
+
+    // Return cached stats if still valid
+    if (this.cachedStats && now - this.statsCacheTime < this.STATS_CACHE_TTL) {
+      return this.cachedStats;
+    }
+
+    // Use incremental stats instead of O(n) computation
+    const avgConfidence = this.patternCount > 0
+      ? this.totalConfidence / this.patternCount
       : 0;
 
-    return {
-      totalPatterns: patterns.length,
+    const stats: CachedStats = {
+      totalPatterns: this.patternCount,
       avgConfidence,
       ruVectorEnabled: this.vectorClient !== null,
       reasoningBankEnabled: this.reasoningBank !== null,
+      embeddingCacheStats: this.embeddingService?.getCacheStats(),
     };
+
+    // Cache the stats
+    this.cachedStats = stats;
+    this.statsCacheTime = now;
+
+    return stats;
+  }
+
+  /**
+   * Invalidate stats cache
+   */
+  private invalidateStatsCache(): void {
+    this.cachedStats = null;
   }
 
   /**
@@ -347,9 +442,14 @@ export class HybridMemorySystem {
   }
 
   /**
-   * Compute embedding for text
+   * Compute embedding for text (using shared embedding service with caching)
    */
   private async computeEmbedding(text: string): Promise<number[]> {
+    // Try shared embedding service first (has caching)
+    if (this.embeddingService) {
+      return await this.embeddingService.computeEmbedding(text);
+    }
+
     // Try agentic-flow embedding service
     if (this.reasoningBank && this.reasoningBank.computeEmbedding) {
       try {
@@ -359,7 +459,7 @@ export class HybridMemorySystem {
       }
     }
 
-    // Simple hash-based embedding
+    // Simple hash-based embedding (fallback)
     const dimension = this.config.embeddingDimension;
     const vector = new Array(dimension).fill(0);
 

@@ -60,6 +60,19 @@ export interface AgenticSkillComposition {
 }
 
 /**
+ * Storage strategy for memory writes
+ */
+export type StorageStrategy = 'all' | 'primary-only' | 'primary-with-backup';
+
+/**
+ * Storage priority configuration
+ */
+export interface StoragePriority {
+  primary: 'local' | 'vector' | 'reasoningBank';
+  backup?: 'local' | 'vector' | 'reasoningBank';
+}
+
+/**
  * Memory system configuration
  */
 export interface AgenticFlowConfig {
@@ -72,6 +85,10 @@ export interface AgenticFlowConfig {
   embeddingDimension: number;
   maxMemorySize: number;
   consolidationThreshold: number;
+  // Storage optimization settings
+  storageStrategy: StorageStrategy;
+  storagePriority: StoragePriority;
+  parallelStorageWrites: boolean;
 }
 
 /**
@@ -87,4 +104,8 @@ export const DEFAULT_AGENTIC_FLOW_CONFIG: AgenticFlowConfig = {
   embeddingDimension: 768,
   maxMemorySize: 10000,
   consolidationThreshold: 0.85,
+  // Optimized defaults - primary storage with optional backup
+  storageStrategy: 'primary-with-backup',
+  storagePriority: { primary: 'vector', backup: 'local' },
+  parallelStorageWrites: true,
 };
