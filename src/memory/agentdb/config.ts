@@ -16,6 +16,11 @@ export interface AgentDBConfig {
   indexType: 'hnsw' | 'flat' | 'ivf';
 
   /**
+   * Use RuVector for high-performance operations
+   */
+  useRuVector: boolean;
+
+  /**
    * HNSW-specific parameters
    */
   hnswParams?: {
@@ -109,6 +114,7 @@ export interface AgentDBConfig {
 export const DEFAULT_AGENTDB_CONFIG: AgentDBConfig = {
   vectorDimension: 768,
   indexType: 'hnsw',
+  useRuVector: true,
   hnswParams: {
     m: 16,
     efConstruction: 200,

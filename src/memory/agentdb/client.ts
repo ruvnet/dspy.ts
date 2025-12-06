@@ -2,6 +2,7 @@
  * AgentDB Client
  *
  * Main client for interacting with AgentDB vector database
+ * Now with RuVector integration for high-performance native operations
  */
 
 import pino from 'pino';
@@ -15,12 +16,15 @@ import {
   MCPTool,
   AgentDBStats,
 } from './types';
+import { RuVectorClient } from '../ruvector/client';
 
 export class AgentDBClient {
   private config: AgentDBConfig;
   private logger: pino.Logger;
   private initialized: boolean = false;
   private db: any; // AgentDB instance
+  private ruVectorClient: RuVectorClient | null = null;
+  private useRuVector: boolean = false;
   private cache: Map<string, SearchResult[]> = new Map();
   private stats: AgentDBStats = {
     totalVectors: 0,
@@ -54,12 +58,30 @@ export class AgentDBClient {
           vectorDimension: this.config.vectorDimension,
           indexType: this.config.indexType,
           mcpEnabled: this.config.mcpEnabled,
+          useRuVector: this.config.useRuVector,
         },
       });
 
-      // Import AgentDB dynamically
-      // Note: AgentDB integration is placeholder for now
-      // In production, replace with actual AgentDB initialization
+      // Try to initialize RuVector for high-performance operations
+      if (this.config.useRuVector) {
+        try {
+          this.ruVectorClient = new RuVectorClient({
+            dimension: this.config.vectorDimension,
+            metric: 'cosine',
+            hnsw: this.config.hnswParams,
+          });
+          await this.ruVectorClient.init();
+          this.useRuVector = true;
+          this.logger.info('RuVector initialized', {
+            implementation: this.ruVectorClient.getImplementationType(),
+          });
+        } catch (ruVectorError) {
+          this.logger.warn('RuVector not available, falling back to AgentDB', { error: ruVectorError });
+          this.useRuVector = false;
+        }
+      }
+
+      // Import AgentDB dynamically as fallback or for additional features
       try {
         const AgentDB = await import('agentdb');
 
@@ -76,8 +98,10 @@ export class AgentDBClient {
         }
       } catch (error) {
         // AgentDB may not be available in all environments
-        this.logger.warn('AgentDB not available, using in-memory fallback', { error });
-        this.db = this.createFallbackDB();
+        if (!this.useRuVector) {
+          this.logger.warn('AgentDB not available, using in-memory fallback', { error });
+          this.db = this.createFallbackDB();
+        }
       }
 
       // Initialize MCP tools if enabled
@@ -103,6 +127,7 @@ export class AgentDBClient {
 
   /**
    * Store a vector in the database
+   * Uses RuVector for high-performance native operations when available
    */
   async store(
     vector: number[],
@@ -128,21 +153,39 @@ export class AgentDBClient {
         updatedAt: now,
       };
 
-      await retry(
-        async () => {
-          await this.db.insert(id, vector, metadata);
-        },
-        {
-          retries: 3,
-          minTimeout: 100,
-          maxTimeout: 1000,
-        }
-      );
+      // Use RuVector for high-performance operations
+      if (this.useRuVector && this.ruVectorClient) {
+        await retry(
+          async () => {
+            await this.ruVectorClient!.insert({
+              id,
+              vector,
+              metadata: { ...metadata, createdAt: now.toISOString(), updatedAt: now.toISOString() },
+            });
+          },
+          {
+            retries: 3,
+            minTimeout: 100,
+            maxTimeout: 1000,
+          }
+        );
+      } else {
+        await retry(
+          async () => {
+            await this.db.insert(id, vector, metadata);
+          },
+          {
+            retries: 3,
+            minTimeout: 100,
+            maxTimeout: 1000,
+          }
+        );
+      }
 
       this.stats.totalVectors++;
       this.invalidateCache();
 
-      this.logger.debug('Vector stored', { id, metadataKeys: Object.keys(metadata) });
+      this.logger.debug('Vector stored', { id, metadataKeys: Object.keys(metadata), useRuVector: this.useRuVector });
       return id;
     } catch (error) {
       this.logger.error('Failed to store vector', { error });
@@ -152,6 +195,7 @@ export class AgentDBClient {
 
   /**
    * Search for similar vectors
+   * Uses RuVector for high-performance native HNSW search when available
    */
   async search(
     query: number[],
@@ -179,36 +223,71 @@ export class AgentDBClient {
     try {
       const startTime = Date.now();
 
-      const results = await retry(
-        async () => {
-          return await this.db.search(query, {
-            k,
-            metric,
-            filter: Object.keys(filter).length > 0 ? filter : undefined,
-          });
-        },
-        {
-          retries: 3,
-          minTimeout: 100,
-          maxTimeout: 1000,
-        }
-      );
+      let searchResults: SearchResult[];
 
-      // Transform results
-      const searchResults: SearchResult[] = results
-        .map((r: any) => ({
+      // Use RuVector for high-performance search
+      if (this.useRuVector && this.ruVectorClient) {
+        const results = await retry(
+          async () => {
+            return await this.ruVectorClient!.search({
+              vector: query,
+              k,
+              filter: Object.keys(filter).length > 0 ? filter : undefined,
+              threshold: minScore,
+            });
+          },
+          {
+            retries: 3,
+            minTimeout: 100,
+            maxTimeout: 1000,
+          }
+        );
+
+        // Transform RuVector results to SearchResult format
+        searchResults = results.map((r) => ({
           id: r.id,
           score: r.score,
-          distance: r.distance,
+          distance: 1 - r.score,
           data: {
             id: r.id,
             vector: includeVectors ? r.vector : [],
             metadata: r.metadata || {},
-            createdAt: r.createdAt || new Date(),
-            updatedAt: r.updatedAt || new Date(),
+            createdAt: r.metadata?.createdAt ? new Date(r.metadata.createdAt) : new Date(),
+            updatedAt: r.metadata?.updatedAt ? new Date(r.metadata.updatedAt) : new Date(),
           },
-        }))
-        .filter((r: SearchResult) => r.score >= minScore);
+        }));
+      } else {
+        const results = await retry(
+          async () => {
+            return await this.db.search(query, {
+              k,
+              metric,
+              filter: Object.keys(filter).length > 0 ? filter : undefined,
+            });
+          },
+          {
+            retries: 3,
+            minTimeout: 100,
+            maxTimeout: 1000,
+          }
+        );
+
+        // Transform results
+        searchResults = results
+          .map((r: any) => ({
+            id: r.id,
+            score: r.score,
+            distance: r.distance,
+            data: {
+              id: r.id,
+              vector: includeVectors ? r.vector : [],
+              metadata: r.metadata || {},
+              createdAt: r.createdAt || new Date(),
+              updatedAt: r.updatedAt || new Date(),
+            },
+          }))
+          .filter((r: SearchResult) => r.score >= minScore);
+      }
 
       // Update stats
       const latency = Date.now() - startTime;
@@ -223,6 +302,7 @@ export class AgentDBClient {
       this.logger.debug('Search completed', {
         resultsCount: searchResults.length,
         latency,
+        useRuVector: this.useRuVector,
       });
 
       return searchResults;
@@ -327,8 +407,34 @@ export class AgentDBClient {
   /**
    * Get statistics
    */
-  getStats(): AgentDBStats {
-    return { ...this.stats };
+  getStats(): AgentDBStats & { ruVectorEnabled: boolean; implementation?: string } {
+    const baseStats = { ...this.stats };
+    return {
+      ...baseStats,
+      ruVectorEnabled: this.useRuVector,
+      implementation: this.useRuVector && this.ruVectorClient
+        ? this.ruVectorClient.getImplementationType()
+        : 'fallback',
+    };
+  }
+
+  /**
+   * Check if RuVector is being used for high-performance operations
+   * @returns true if RuVector is enabled and initialized
+   */
+  isUsingRuVector(): boolean {
+    return this.useRuVector && this.ruVectorClient !== null;
+  }
+
+  /**
+   * Get the RuVector implementation type
+   * @returns 'native', 'wasm', or 'none' if RuVector is not being used
+   */
+  getRuVectorImplementation(): 'native' | 'wasm' | 'none' {
+    if (this.useRuVector && this.ruVectorClient) {
+      return this.ruVectorClient.getImplementationType();
+    }
+    return 'none';
   }
 
   /**
