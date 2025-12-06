@@ -31,6 +31,20 @@ import {
   RuVectorEnhancedStats,
   RuVectorOptimizeOptions,
   CacheEntry,
+  // New types for v2.5 features
+  RuVectorPaginatedQuery,
+  RuVectorPaginatedResult,
+  RuVectorScanOptions,
+  HNSWStats,
+  HNSWTuneRequest,
+  RuVectorSnapshot,
+  RuVectorSnapshotOptions,
+  RuVectorExportOptions,
+  RuVectorImportOptions,
+  RuVectorDistanceMatrixRequest,
+  RuVectorDistanceMatrixResult,
+  RuVectorAttentionRequest,
+  RuVectorAttentionResult,
 } from './types';
 
 /**
@@ -875,5 +889,456 @@ export class RuVectorClient {
     sum[0] = Math.sqrt(1 + spaceNormSq);
 
     return sum;
+  }
+
+  // ============================================================================
+  // Streaming & Pagination Methods
+  // ============================================================================
+
+  /**
+   * Search with pagination for large result sets
+   */
+  async searchPaginated(query: RuVectorPaginatedQuery): Promise<RuVectorPaginatedResult> {
+    this.ensureInitialized();
+
+    const { pagination } = query;
+    const page = pagination.page ?? 0;
+    const pageSize = pagination.pageSize;
+
+    // Get all results first (we'll optimize with cursor-based pagination later)
+    const allResults = await this.search({
+      vector: query.vector,
+      k: (page + 1) * pageSize + pageSize, // Fetch enough for next page check
+      filter: query.filter,
+      threshold: query.threshold,
+    });
+
+    const totalResults = allResults.length;
+    const totalPages = Math.ceil(totalResults / pageSize);
+    const startIndex = page * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, totalResults);
+    const results = allResults.slice(startIndex, endIndex);
+    const hasMore = endIndex < totalResults;
+
+    // Generate cursor for next page
+    const nextCursor = hasMore
+      ? Buffer.from(JSON.stringify({ page: page + 1, query: query.vector.slice(0, 10) })).toString('base64')
+      : undefined;
+
+    return {
+      results,
+      pagination: {
+        page,
+        pageSize,
+        totalResults,
+        totalPages,
+        hasMore,
+        nextCursor,
+      },
+    };
+  }
+
+  /**
+   * Create an async iterator for streaming search results
+   */
+  async *searchStream(
+    query: RuVectorQuery,
+    batchSize: number = 100
+  ): AsyncGenerator<RuVectorResult, void, unknown> {
+    this.ensureInitialized();
+
+    let offset = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const results = await this.search({
+        ...query,
+        k: batchSize,
+      });
+
+      // In a real implementation, we would use offset-based pagination
+      // For now, we yield all results and stop
+      for (const result of results) {
+        yield result;
+      }
+
+      // Since ruvector doesn't support offset natively, we stop after first batch
+      hasMore = false;
+      offset += results.length;
+    }
+  }
+
+  /**
+   * Scan all vectors with optional filtering
+   */
+  async *scanAll(options: RuVectorScanOptions = {}): AsyncGenerator<RuVectorEntry, void, unknown> {
+    this.ensureInitialized();
+
+    const { batchSize = 1000, filter, includeVectors = true } = options;
+
+    // Get stats to know total count
+    const stats = this.getStats();
+    const totalCount = stats.count;
+
+    if (totalCount === 0) return;
+
+    // For now, we simulate scanning by searching with a random vector
+    // In production, ruvector would provide a native scan API
+    const randomVector = new Array(this.config.dimension).fill(0).map(() => Math.random() * 2 - 1);
+
+    let yielded = 0;
+    const results = await this.search({
+      vector: randomVector,
+      k: Math.min(totalCount, 10000), // Cap at 10k for safety
+      filter,
+    });
+
+    for (const result of results) {
+      yield {
+        id: result.id,
+        vector: includeVectors ? result.vector : [],
+        metadata: result.metadata,
+      };
+      yielded++;
+
+      if (yielded >= totalCount) break;
+    }
+  }
+
+  // ============================================================================
+  // HNSW Tuning Methods
+  // ============================================================================
+
+  /**
+   * Get HNSW index statistics
+   */
+  getHNSWStats(): HNSWStats {
+    this.ensureInitialized();
+
+    const stats = this.db.stats();
+    const vectorCount = stats.count;
+
+    // Estimate HNSW statistics
+    // These are approximations based on typical HNSW behavior
+    const m = this.config.hnsw?.m || 16;
+    const avgConnectivity = m * 2; // Approximate
+    const maxLevel = Math.floor(Math.log(vectorCount + 1) / Math.log(m)) + 1;
+    const edgeCount = vectorCount * avgConnectivity;
+
+    return {
+      layerCount: maxLevel,
+      edgeCount,
+      avgConnectivity,
+      maxLevel,
+      entryPointId: undefined, // Would need native support
+      indexSizeBytes: stats.memoryUsage || vectorCount * this.config.dimension * 4,
+    };
+  }
+
+  /**
+   * Tune HNSW parameters at runtime
+   */
+  async tuneHNSW(request: HNSWTuneRequest): Promise<void> {
+    this.ensureInitialized();
+
+    if (request.efSearch !== undefined) {
+      // Update efSearch for subsequent queries
+      this.config.hnsw = {
+        ...this.config.hnsw,
+        efSearch: request.efSearch,
+      };
+      this.logger.info('HNSW efSearch updated', { efSearch: request.efSearch });
+    }
+
+    if (request.rebuildIndex) {
+      await this.buildIndex();
+      this.logger.info('HNSW index rebuilt');
+    }
+
+    // Invalidate cache after tuning
+    this.cache.clear();
+  }
+
+  /**
+   * Auto-tune HNSW parameters based on recall target
+   */
+  async autoTuneHNSW(targetRecall: number = 0.95): Promise<{ efSearch: number; estimatedRecall: number }> {
+    this.ensureInitialized();
+
+    // Start with current efSearch or default
+    let efSearch = this.config.hnsw?.efSearch || 50;
+    let estimatedRecall = 0.9; // Initial estimate
+
+    // Binary search for optimal efSearch
+    let low = 10;
+    let high = 500;
+
+    while (high - low > 10) {
+      const mid = Math.floor((low + high) / 2);
+      // Estimate recall based on efSearch (simplified model)
+      estimatedRecall = 1 - Math.exp(-mid / 50);
+
+      if (estimatedRecall < targetRecall) {
+        low = mid;
+      } else {
+        high = mid;
+        efSearch = mid;
+      }
+    }
+
+    await this.tuneHNSW({ efSearch });
+
+    return { efSearch, estimatedRecall };
+  }
+
+  // ============================================================================
+  // Snapshot & Versioning Methods
+  // ============================================================================
+
+  private snapshots: Map<string, RuVectorSnapshot> = new Map();
+
+  /**
+   * Create a named snapshot
+   */
+  async createSnapshot(options: RuVectorSnapshotOptions): Promise<RuVectorSnapshot> {
+    this.ensureInitialized();
+
+    const stats = this.getStats();
+    const snapshotId = `snap_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Save current state
+    const snapshotPath = this.config.path
+      ? `${this.config.path}.${snapshotId}`
+      : undefined;
+
+    if (snapshotPath) {
+      await this.save(snapshotPath);
+    }
+
+    const snapshot: RuVectorSnapshot = {
+      id: snapshotId,
+      name: options.name,
+      timestamp: Date.now(),
+      vectorCount: stats.count,
+      dimension: stats.dimension,
+      sizeBytes: stats.memoryUsage || 0,
+      metadata: options.metadata,
+    };
+
+    this.snapshots.set(snapshotId, snapshot);
+    this.logger.info('Snapshot created', { snapshotId, name: options.name });
+
+    return snapshot;
+  }
+
+  /**
+   * List all snapshots
+   */
+  listSnapshots(): RuVectorSnapshot[] {
+    return Array.from(this.snapshots.values()).sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  /**
+   * Restore from a snapshot
+   */
+  async restoreSnapshot(snapshotId: string): Promise<void> {
+    const snapshot = this.snapshots.get(snapshotId);
+    if (!snapshot) {
+      throw new Error(`Snapshot not found: ${snapshotId}`);
+    }
+
+    const snapshotPath = this.config.path
+      ? `${this.config.path}.${snapshotId}`
+      : undefined;
+
+    if (snapshotPath) {
+      await this.load(snapshotPath);
+      this.cache.clear();
+      this.logger.info('Snapshot restored', { snapshotId });
+    } else {
+      throw new Error('Cannot restore snapshot: no path configured');
+    }
+  }
+
+  /**
+   * Delete a snapshot
+   */
+  deleteSnapshot(snapshotId: string): boolean {
+    const deleted = this.snapshots.delete(snapshotId);
+    if (deleted) {
+      this.logger.info('Snapshot deleted', { snapshotId });
+    }
+    return deleted;
+  }
+
+  /**
+   * Export vectors to JSON
+   */
+  async exportVectors(options: RuVectorExportOptions): Promise<string> {
+    this.ensureInitialized();
+
+    const vectors: RuVectorEntry[] = [];
+
+    for await (const entry of this.scanAll({
+      filter: options.filter,
+      includeVectors: true,
+    })) {
+      const exportEntry: RuVectorEntry = {
+        id: entry.id,
+        vector: entry.vector,
+      };
+
+      if (options.includeMetadata && entry.metadata) {
+        exportEntry.metadata = entry.metadata;
+      }
+
+      vectors.push(exportEntry);
+    }
+
+    if (options.format === 'json') {
+      return JSON.stringify(vectors, null, 2);
+    }
+
+    // Binary format: simple concatenation
+    return JSON.stringify(vectors);
+  }
+
+  /**
+   * Import vectors from JSON
+   */
+  async importVectors(data: string, options: RuVectorImportOptions): Promise<{ imported: number; skipped: number }> {
+    this.ensureInitialized();
+
+    const vectors: RuVectorEntry[] = JSON.parse(data);
+    let imported = 0;
+    let skipped = 0;
+
+    if (options.mode === 'replace') {
+      await this.clear();
+    }
+
+    for (const entry of vectors) {
+      if (options.validateDimension && entry.vector.length !== this.config.dimension) {
+        this.logger.warn('Skipping vector with wrong dimension', {
+          id: entry.id,
+          expected: this.config.dimension,
+          got: entry.vector.length,
+        });
+        skipped++;
+        continue;
+      }
+
+      if (options.mode === 'skip-existing') {
+        const existing = await this.get(entry.id);
+        if (existing) {
+          skipped++;
+          continue;
+        }
+      }
+
+      await this.insert(entry);
+      imported++;
+    }
+
+    this.logger.info('Import completed', { imported, skipped });
+    return { imported, skipped };
+  }
+
+  // ============================================================================
+  // Distance Matrix & Attention Methods
+  // ============================================================================
+
+  /**
+   * Compute full distance matrix between vectors
+   */
+  computeDistanceMatrix(request: RuVectorDistanceMatrixRequest): RuVectorDistanceMatrixResult {
+    const startTime = Date.now();
+    const { vectors, metric = 'cosine', symmetric = true } = request;
+    const n = vectors.length;
+    const matrix: number[][] = new Array(n);
+
+    for (let i = 0; i < n; i++) {
+      matrix[i] = new Array(n);
+      matrix[i][i] = 0; // Distance to self is 0
+
+      const jStart = symmetric ? i + 1 : 0;
+      for (let j = jStart; j < n; j++) {
+        if (i === j) continue;
+
+        const distance = this.computeDistance(vectors[i], vectors[j], metric);
+        matrix[i][j] = distance;
+
+        if (symmetric) {
+          matrix[j][i] = distance;
+        }
+      }
+    }
+
+    return {
+      matrix,
+      metric,
+      computeTimeMs: Date.now() - startTime,
+      size: n,
+    };
+  }
+
+  /**
+   * Compute attention scores (Q @ K^T with optional scaling)
+   */
+  computeAttentionScores(request: RuVectorAttentionRequest): RuVectorAttentionResult {
+    const startTime = Date.now();
+    const { queries, keys, scale, metric = 'dot' } = request;
+
+    const numQueries = queries.length;
+    const numKeys = keys.length;
+    const scores: number[][] = new Array(numQueries);
+
+    // Default scale is 1/sqrt(dimension)
+    const dim = queries[0]?.length || 1;
+    const scaleFactor = scale ?? 1 / Math.sqrt(dim);
+
+    for (let i = 0; i < numQueries; i++) {
+      scores[i] = new Array(numKeys);
+
+      for (let j = 0; j < numKeys; j++) {
+        let score: number;
+
+        if (metric === 'dot') {
+          // Raw dot product
+          score = 0;
+          for (let k = 0; k < dim; k++) {
+            score += queries[i][k] * keys[j][k];
+          }
+        } else {
+          // Cosine similarity
+          let dot = 0, normQ = 0, normK = 0;
+          for (let k = 0; k < dim; k++) {
+            dot += queries[i][k] * keys[j][k];
+            normQ += queries[i][k] * queries[i][k];
+            normK += keys[j][k] * keys[j][k];
+          }
+          score = dot / (Math.sqrt(normQ) * Math.sqrt(normK) + 1e-10);
+        }
+
+        scores[i][j] = score * scaleFactor;
+      }
+    }
+
+    return {
+      scores,
+      computeTimeMs: Date.now() - startTime,
+    };
+  }
+
+  /**
+   * Apply softmax to attention scores
+   */
+  applySoftmax(scores: number[][]): number[][] {
+    return scores.map(row => {
+      const maxScore = Math.max(...row);
+      const expScores = row.map(s => Math.exp(s - maxScore));
+      const sumExp = expScores.reduce((a, b) => a + b, 0);
+      return expScores.map(e => e / sumExp);
+    });
   }
 }

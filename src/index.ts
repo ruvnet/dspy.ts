@@ -90,6 +90,26 @@ export type {
   RuVectorCacheConfig,
   RuVectorEnhancedStats,
   RuVectorOptimizeOptions,
+  // Streaming & Pagination (v2.5)
+  RuVectorPaginationOptions,
+  RuVectorPaginatedQuery,
+  RuVectorPaginatedResult,
+  RuVectorSearchCursor,
+  RuVectorScanOptions,
+  // HNSW Tuning (v2.5)
+  HNSWParams,
+  HNSWStats,
+  HNSWTuneRequest,
+  // Snapshot & Versioning (v2.5)
+  RuVectorSnapshot,
+  RuVectorSnapshotOptions,
+  RuVectorExportOptions,
+  RuVectorImportOptions,
+  // Distance Matrix & Attention (v2.5)
+  RuVectorDistanceMatrixRequest,
+  RuVectorDistanceMatrixResult,
+  RuVectorAttentionRequest,
+  RuVectorAttentionResult,
 } from './memory/ruvector/types';
 
 // ReasoningBank - Self-learning memory system with intelligence optimization

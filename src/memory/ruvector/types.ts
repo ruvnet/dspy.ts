@@ -219,3 +219,185 @@ export interface RuVectorEnhancedStats extends RuVectorStats {
     insertThroughput: number;
   };
 }
+
+// ============================================================================
+// Streaming & Pagination Types
+// ============================================================================
+
+/**
+ * Pagination options for large result sets
+ */
+export interface RuVectorPaginationOptions {
+  pageSize: number;
+  page?: number;
+  cursor?: string;
+}
+
+/**
+ * Paginated search query
+ */
+export interface RuVectorPaginatedQuery extends RuVectorQuery {
+  pagination: RuVectorPaginationOptions;
+}
+
+/**
+ * Paginated search result
+ */
+export interface RuVectorPaginatedResult {
+  results: RuVectorResult[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalResults: number;
+    totalPages: number;
+    hasMore: boolean;
+    nextCursor?: string;
+  };
+}
+
+/**
+ * Search cursor for streaming
+ */
+export interface RuVectorSearchCursor {
+  id: string;
+  query: RuVectorQuery;
+  position: number;
+  hasMore: boolean;
+  createdAt: number;
+}
+
+/**
+ * Iterator result for streaming
+ */
+export interface RuVectorIteratorResult {
+  value: RuVectorResult;
+  done: boolean;
+}
+
+/**
+ * Scan options for iterating all vectors
+ */
+export interface RuVectorScanOptions {
+  batchSize?: number;
+  filter?: Record<string, any>;
+  includeVectors?: boolean;
+}
+
+// ============================================================================
+// HNSW Tuning Types
+// ============================================================================
+
+/**
+ * HNSW index parameters
+ */
+export interface HNSWParams {
+  m?: number;
+  efConstruction?: number;
+  efSearch?: number;
+}
+
+/**
+ * HNSW index statistics
+ */
+export interface HNSWStats {
+  layerCount: number;
+  edgeCount: number;
+  avgConnectivity: number;
+  maxLevel: number;
+  entryPointId?: string;
+  indexSizeBytes: number;
+}
+
+/**
+ * HNSW tuning request
+ */
+export interface HNSWTuneRequest {
+  efSearch?: number;
+  rebuildIndex?: boolean;
+  targetRecall?: number;
+}
+
+// ============================================================================
+// Snapshot & Versioning Types
+// ============================================================================
+
+/**
+ * Snapshot metadata
+ */
+export interface RuVectorSnapshot {
+  id: string;
+  name: string;
+  timestamp: number;
+  vectorCount: number;
+  dimension: number;
+  sizeBytes: number;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Snapshot creation options
+ */
+export interface RuVectorSnapshotOptions {
+  name: string;
+  metadata?: Record<string, any>;
+  compress?: boolean;
+}
+
+/**
+ * Export options
+ */
+export interface RuVectorExportOptions {
+  format: 'json' | 'binary';
+  includeMetadata?: boolean;
+  filter?: Record<string, any>;
+  compress?: boolean;
+}
+
+/**
+ * Import options
+ */
+export interface RuVectorImportOptions {
+  mode: 'replace' | 'merge' | 'skip-existing';
+  validateDimension?: boolean;
+}
+
+// ============================================================================
+// Distance Matrix Types
+// ============================================================================
+
+/**
+ * Distance matrix computation request
+ */
+export interface RuVectorDistanceMatrixRequest {
+  vectors: number[][];
+  metric?: 'cosine' | 'euclidean' | 'dot' | 'lorentz';
+  symmetric?: boolean;
+}
+
+/**
+ * Distance matrix result
+ */
+export interface RuVectorDistanceMatrixResult {
+  matrix: number[][];
+  metric: string;
+  computeTimeMs: number;
+  size: number;
+}
+
+/**
+ * Attention score computation request
+ */
+export interface RuVectorAttentionRequest {
+  queries: number[][];
+  keys: number[][];
+  scale?: number;
+  metric?: 'dot' | 'cosine';
+}
+
+/**
+ * Attention scores result
+ */
+export interface RuVectorAttentionResult {
+  scores: number[][];
+  computeTimeMs: number;
+}
