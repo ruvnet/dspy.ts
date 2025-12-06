@@ -65,7 +65,7 @@ export type {
   AgentDBStats,
 } from './memory/agentdb/types';
 
-// RuVector - High-performance native vector operations
+// RuVector - High-performance native vector operations with optimized caching
 export { RuVectorClient } from './memory/ruvector/client';
 export {
   runBenchmarkSuite as runVectorBenchmark,
@@ -77,6 +77,19 @@ export type {
   RuVectorResult,
   RuVectorConfig,
   RuVectorStats,
+  // Batch operations
+  RuVectorBatchQuery,
+  RuVectorBatchResult,
+  // Distance computation for attention
+  RuVectorDistanceRequest,
+  RuVectorDistanceResult,
+  RuVectorCentroidRequest,
+  RuVectorCentroidResult,
+  // Cache management
+  RuVectorCacheStats,
+  RuVectorCacheConfig,
+  RuVectorEnhancedStats,
+  RuVectorOptimizeOptions,
 } from './memory/ruvector/types';
 
 // ReasoningBank - Self-learning memory system with intelligence optimization
