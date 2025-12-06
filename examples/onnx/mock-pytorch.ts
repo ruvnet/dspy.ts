@@ -17,17 +17,26 @@ export const nn = {
   }))
 };
 
-export const tensor = jest.fn().mockImplementation((data: number[] | Float32Array, options?: { requiresGrad?: boolean }) => ({
-  shape: Array.isArray(data) ? [data.length] : [data.byteLength / 4],
-  dataSync: jest.fn().mockReturnValue(Array.isArray(data) ? new Float32Array(data) : data),
-  add: jest.fn().mockReturnValue(tensor([0])),
-  pow: jest.fn().mockReturnValue(tensor([0])),
-  sum: jest.fn().mockReturnValue(tensor([0])),
-  backward: jest.fn(),
-  relu: jest.fn().mockReturnValue(tensor([0])),
-  to: jest.fn().mockReturnValue(tensor([0])),
-  copy_: jest.fn()
-}));
+// Create a mock tensor object without recursive calls
+const createMockTensor = (data: number[] | Float32Array) => {
+  const mockTensor: any = {
+    shape: Array.isArray(data) ? [data.length] : [data.byteLength / 4],
+    dataSync: jest.fn().mockReturnValue(Array.isArray(data) ? new Float32Array(data) : data),
+    backward: jest.fn(),
+    copy_: jest.fn(),
+  };
+  // Use lazy evaluation to avoid infinite recursion
+  mockTensor.add = jest.fn().mockImplementation(() => createMockTensor([0]));
+  mockTensor.pow = jest.fn().mockImplementation(() => createMockTensor([0]));
+  mockTensor.sum = jest.fn().mockImplementation(() => createMockTensor([0]));
+  mockTensor.relu = jest.fn().mockImplementation(() => createMockTensor([0]));
+  mockTensor.to = jest.fn().mockImplementation(() => mockTensor);
+  return mockTensor;
+};
+
+export const tensor = jest.fn().mockImplementation((data: number[] | Float32Array, options?: { requiresGrad?: boolean }) =>
+  createMockTensor(data)
+);
 
 export const device = jest.fn().mockImplementation((type: string) => ({ type }));
 
