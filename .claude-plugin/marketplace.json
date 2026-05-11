@@ -87,7 +87,7 @@
       "description": "Vertical appliance: a DSPy.ts ETL/classification pipeline — typed Predict modules in a Pipeline, BootstrapFewShot from a labeled CSV, evaluated batch.",
       "version": "0.1.0",
       "category": "appliance",
-      "status": "planned"
+      "status": "available"
     }
   ]
 }
