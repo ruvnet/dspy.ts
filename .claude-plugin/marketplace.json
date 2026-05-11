@@ -79,7 +79,7 @@
       "description": "Vertical appliance: a DSPy.ts research assistant — ReAct(search tools)+reflexion → synthesize → cite; optimized for grounded answers.",
       "version": "0.1.0",
       "category": "appliance",
-      "status": "planned"
+      "status": "available"
     },
     {
       "name": "dspy-appliance-data-pipeline",
