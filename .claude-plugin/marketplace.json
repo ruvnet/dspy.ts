@@ -71,7 +71,7 @@
       "description": "Vertical appliance: a DSPy.ts code-review pipeline — Retrieve(repo context) → ChainOfThought(review) → metric on actionability; GEPA-tuned.",
       "version": "0.1.0",
       "category": "appliance",
-      "status": "planned"
+      "status": "available"
     },
     {
       "name": "dspy-appliance-research-assistant",
