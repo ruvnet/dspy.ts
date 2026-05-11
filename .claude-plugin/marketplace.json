@@ -39,7 +39,7 @@
       "description": "ReAct agents with tool registries + `ReActReflexion` (recall lessons, record episodes, promote skills); `react-engineer` agent.",
       "version": "0.1.0",
       "category": "official",
-      "status": "planned"
+      "status": "available"
     },
     {
       "name": "dspy-observability",
