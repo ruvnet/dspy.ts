@@ -63,7 +63,7 @@
       "description": "Vertical appliance: a pre-wired DSPy.ts support assistant — RAG over a knowledge base + ChainOfThought answer + a quality metric + MIPROv2 tuning.",
       "version": "0.1.0",
       "category": "appliance",
-      "status": "planned"
+      "status": "available"
     },
     {
       "name": "dspy-appliance-code-review",
