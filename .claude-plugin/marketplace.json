@@ -47,7 +47,7 @@
       "description": "`CompilationTracer` causal-chain traces, AgentDB persistence, optional MLflow; `CachingLM` setup; `observability-engineer` agent.",
       "version": "0.1.0",
       "category": "official",
-      "status": "planned"
+      "status": "available"
     },
     {
       "name": "dspy-evolution",
