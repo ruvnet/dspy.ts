@@ -31,7 +31,7 @@
       "description": "RAG with `RetrieveModule` over AgentDB (HNSW, RaBitQ, MMR) wired into ChainOfThought; `rag-architect` agent; corpus-indexing commands.",
       "version": "0.1.0",
       "category": "official",
-      "status": "planned"
+      "status": "available"
     },
     {
       "name": "dspy-react",
