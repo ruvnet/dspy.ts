@@ -180,6 +180,35 @@ await opt.compile(qa, trainset);
 
 ---
 
+## Plugins (Claude Code & Codex)
+
+DSPy.ts ships a **plugin marketplace** so you can program, compile, evaluate, and run DSPy.ts programs from inside Claude Code or OpenAI Codex — commands, sub-agents, design skills, and bundled MCP servers exposing the library as tools/resources. See [`docs/adr/ADR-0001-claude-code-plugin-marketplace.md`](./docs/adr/ADR-0001-claude-code-plugin-marketplace.md).
+
+```bash
+# add the marketplace, then install a plugin
+/plugin marketplace add ruvnet/dspy.ts
+/plugin install dspy-core@dspy.ts
+# or try one locally from a checkout
+claude --plugin-dir ./plugins/dspy-core
+```
+
+| Plugin | What it does |
+|--------|--------------|
+| `dspy-core` | Scaffold / compile (BootstrapFewShot · MIPROv2 · GEPA) / evaluate programs; `dspy-architect` agent; signature- & metric-design skills; MCP tools for the library |
+| `dspy-optimize` | Deep optimizer workflows — MIPROv2 + experience replay, GEPA Pareto evolution, BootstrapFewShot dynamic demos; `optimizer-engineer` agent |
+| `dspy-rag` | `RetrieveModule` (MMR) over an AgentDB corpus → `ChainOfThought`, grounded + cited; corpus indexing; `rag-architect` agent |
+| `dspy-react` | ReAct agents + tool registries + `ReActReflexion` (recall lessons, record episodes, promote skills); `react-engineer` agent |
+| `dspy-observability` | `CompilationTracer` causal-chain traces (AgentDB / optional MLflow) + `CachingLM`; `observability-engineer` agent |
+| `dspy-evolution` *(exotic)* | Multi-generation GEPA self-evolution against a held-out benchmark — persistent Pareto frontier, warm-start, optional structural exploration; `evolution-coordinator` agent |
+| `dspy-appliance-support-bot` | Vertical appliance: a pre-wired RAG support assistant (Retrieve → CoT + citations + quality metric + MIPROv2 tuning) |
+| `dspy-appliance-code-review` | Vertical appliance: a code-review pipeline (Retrieve repo context → CoT structured review + actionability metric + GEPA tuning) |
+| `dspy-appliance-research-assistant` | Vertical appliance: a ReAct(search/fetch/note)+reflexion → CoT synthesizer that writes grounded, cited answers |
+| `dspy-appliance-data-pipeline` | Vertical appliance: typed `PredictModule` stages in a `Pipeline` + CSV/JSONL batch I/O + BootstrapFewShot from a labeled CSV |
+
+Source: [`plugins/`](./plugins/) · marketplace manifest: [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json)
+
+---
+
 ## Documentation
 
 | Doc | Where |
