@@ -55,7 +55,7 @@
       "description": "Exotic: GEPA-driven self-evolution loops that optimize a program's prompts (and the program itself) against a benchmark across runs; `evolution-coordinator` agent.",
       "version": "0.1.0",
       "category": "exotic",
-      "status": "planned"
+      "status": "available"
     },
     {
       "name": "dspy-appliance-support-bot",
