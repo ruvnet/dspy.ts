@@ -58,11 +58,11 @@ export class ReasoningBank {
       });
 
       this.initialized = true;
-      this.logger.info('ReasoningBank initialized', {
+      this.logger.info({
         units: this.units.size,
-      });
+      }, 'ReasoningBank initialized');
     } catch (error) {
-      this.logger.error('Failed to initialize ReasoningBank', { error });
+      this.logger.error({ error }, 'Failed to initialize ReasoningBank');
       throw error;
     }
   }
@@ -86,9 +86,9 @@ export class ReasoningBank {
       // Store in local map
       this.units.set(unit.id, unit);
 
-      this.logger.debug('Knowledge unit stored', { id: unit.id });
+      this.logger.debug({ id: unit.id }, 'Knowledge unit stored');
     } catch (error) {
-      this.logger.error('Failed to store knowledge unit', { error });
+      this.logger.error({ error }, 'Failed to store knowledge unit');
       throw error;
     }
   }
@@ -137,10 +137,10 @@ export class ReasoningBank {
       // Limit results
       results = results.slice(0, limit);
 
-      this.logger.debug('Retrieved knowledge units', { count: results.length });
+      this.logger.debug({ count: results.length }, 'Retrieved knowledge units');
       return results;
     } catch (error) {
-      this.logger.error('Failed to retrieve knowledge units', { error });
+      this.logger.error({ error }, 'Failed to retrieve knowledge units');
       throw error;
     }
   }
@@ -152,9 +152,9 @@ export class ReasoningBank {
     this.ensureInitialized();
 
     try {
-      this.logger.debug('Learning from experience', {
+      this.logger.debug({
         success: experience.success,
-      });
+      }, 'Learning from experience');
 
       // Check if similar knowledge already exists
       const similar = await this.findSimilar(experience);
@@ -175,10 +175,10 @@ export class ReasoningBank {
         await this.store(unit);
       }
 
-      this.logger.info('Learned from experience', { unitId: unit.id });
+      this.logger.info({ unitId: unit.id }, 'Learned from experience');
       return unit;
     } catch (error) {
-      this.logger.error('Failed to learn from experience', { error });
+      this.logger.error({ error }, 'Failed to learn from experience');
       throw error;
     }
   }
@@ -208,10 +208,10 @@ export class ReasoningBank {
       // Sort by similarity
       matches.sort((a, b) => b.similarity - a.similarity);
 
-      this.logger.debug('Found pattern matches', { count: matches.length });
+      this.logger.debug({ count: matches.length }, 'Found pattern matches');
       return matches;
     } catch (error) {
-      this.logger.error('Failed to find patterns', { error });
+      this.logger.error({ error }, 'Failed to find patterns');
       throw error;
     }
   }
@@ -272,13 +272,13 @@ export class ReasoningBank {
       // Evolve remaining knowledge
       const evolution = await this.safla.evolve(keep);
 
-      this.logger.info('Knowledge evolution complete', {
+      this.logger.info({
         pruned: prune.length,
         kept: keep.length,
         insights: evolution.insights.length,
-      });
+      }, 'Knowledge evolution complete');
     } catch (error) {
-      this.logger.error('Evolution failed', { error });
+      this.logger.error({ error }, 'Evolution failed');
       throw error;
     }
   }
@@ -329,7 +329,7 @@ export class ReasoningBank {
       this.initialized = false;
       this.logger.info('ReasoningBank cleaned up');
     } catch (error) {
-      this.logger.error('Cleanup failed', { error });
+      this.logger.error({ error }, 'Cleanup failed');
       throw error;
     }
   }
@@ -343,7 +343,7 @@ export class ReasoningBank {
       // For now, we start with empty set
       this.logger.debug('Loading knowledge units from AgentDB');
     } catch (error) {
-      this.logger.error('Failed to load knowledge units', { error });
+      this.logger.error({ error }, 'Failed to load knowledge units');
       throw error;
     }
   }
@@ -530,3 +530,4 @@ export class ReasoningBank {
     return true;
   }
 }
+
