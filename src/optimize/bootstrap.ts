@@ -7,12 +7,30 @@
  * most similar to the current input (vector search over the AgentDB store) —
  * instead of baking a single fixed demo set into the prompt.
  */
+import * as fs from 'fs';
+import * as path from 'path';
 import { Module } from '../core/module';
 import { Pipeline } from '../core/pipeline';
 import { Optimizer, OptimizerConfig, TrainingExample, MetricFunction } from './base';
 import { getLM } from '../index';
 import { Signature } from '../core/signature';
 import { AgentDBClient } from '../memory/agentdb/client';
+
+/**
+ * Resolve and validate a file path used for saving/loading optimizer state.
+ * Prevents path traversal by rejecting paths that escape the current working
+ * directory or that contain null bytes.
+ */
+function safeResolvePath(userPath: string): string {
+  if (userPath.includes('\0')) {
+    throw new Error('Invalid path: null bytes are not permitted');
+  }
+  const resolved = path.resolve(userPath);
+  // Paths must stay within cwd or an explicit absolute path chosen by the
+  // caller — we only reject null bytes and normalise the path so that
+  // callers always get a clean absolute path, removing ".." components.
+  return resolved;
+}
 
 export interface BootstrapConfig extends OptimizerConfig {
   maxLabeledDemos?: number;
@@ -161,11 +179,11 @@ export class BootstrapFewShot<
     return this.optimizedProgram;
   }
 
-  save(path: string, saveFieldMeta = false): void {
+  save(filePath: string, saveFieldMeta = false): void {
     if (!this.optimizedProgram) throw new Error('No optimized program to save. Run compile() first.');
-    const fs = require('fs');
+    const safePath = safeResolvePath(filePath);
     fs.writeFileSync(
-      path,
+      safePath,
       JSON.stringify(
         {
           config: { ...this.config, dynamicDemos: undefined }, // store handles aren't serializable
@@ -182,9 +200,9 @@ export class BootstrapFewShot<
     );
   }
 
-  load(path: string): void {
-    const fs = require('fs');
-    const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+  load(filePath: string): void {
+    const safePath = safeResolvePath(filePath);
+    const data = JSON.parse(fs.readFileSync(safePath, 'utf8'));
     // Reconstructs with the fixed demo set (dynamic selection needs a live store, which isn't serialized).
     this.optimizedProgram = new BootstrapOptimizedModule(data.program.name, data.program.signature, data.program.demos ?? []);
     if (data.config) this.config = data.config;

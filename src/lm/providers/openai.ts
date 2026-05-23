@@ -7,6 +7,47 @@
 import { LMDriver, GenerationOptions, LMError } from '../base';
 
 /**
+ * Validate that an LM API endpoint URL uses HTTPS and does not point at a
+ * private/loopback address. This prevents SSRF when callers supply a custom
+ * endpoint at runtime.
+ *
+ * Allowed: any https:// URL whose hostname is not a private/loopback address.
+ * Callers that genuinely need to talk to a local mock server in tests should
+ * pass their endpoint through an explicit allow-list rather than bypassing
+ * this check.
+ */
+function validateEndpoint(endpoint: string): void {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new LMError(`Invalid endpoint URL: ${endpoint}`, 'INVALID_CONFIG');
+  }
+  if (url.protocol !== 'https:') {
+    throw new LMError(
+      `Endpoint must use HTTPS. Got: ${url.protocol}`,
+      'INVALID_CONFIG'
+    );
+  }
+  const host = url.hostname.toLowerCase();
+  const privatePatterns = [
+    /^localhost$/,
+    /^127\./,
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+    /^192\.168\./,
+    /^::1$/,
+    /^fd[0-9a-f]{2}:/i,
+  ];
+  if (privatePatterns.some((p) => p.test(host))) {
+    throw new LMError(
+      `Endpoint must not resolve to a private or loopback address. Got: ${host}`,
+      'INVALID_CONFIG'
+    );
+  }
+}
+
+/**
  * OpenAI API configuration
  */
 export interface OpenAIConfig {
@@ -69,10 +110,13 @@ export class OpenAILM implements LMDriver {
   private initialized: boolean = false;
 
   constructor(config: OpenAIConfig) {
+    const endpoint = config.endpoint || 'https://api.openai.com/v1';
+    // Validate at construction time so misconfiguration is caught early.
+    validateEndpoint(endpoint);
     this.config = {
       apiKey: config.apiKey,
       model: config.model || 'gpt-3.5-turbo',
-      endpoint: config.endpoint || 'https://api.openai.com/v1',
+      endpoint,
       organization: config.organization,
       defaultOptions: config.defaultOptions || {},
     };

@@ -8,6 +8,7 @@
 import { Module } from '../core/module';
 import { Signature } from '../core/signature';
 import { getLM } from '../lm';
+import { sanitizeUserInput } from '../utils/sanitize';
 
 /**
  * Chain-of-Thought module that extends predictions with reasoning
@@ -111,12 +112,14 @@ export class ChainOfThought<
     );
     parts.push('');
 
-    // Add input fields
+    // Add input fields — sanitize string values to mitigate prompt injection
     parts.push('Input:');
     for (const field of this.signature.inputs) {
       const value = input[field.name];
       if (value !== undefined) {
-        parts.push(`${field.name}: ${JSON.stringify(value)}`);
+        const safe =
+          typeof value === 'string' ? sanitizeUserInput(value) : value;
+        parts.push(`${field.name}: ${JSON.stringify(safe)}`);
       }
     }
     parts.push('');

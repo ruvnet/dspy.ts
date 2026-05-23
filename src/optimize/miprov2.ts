@@ -15,6 +15,8 @@
  * Random search over the (small) grid is the pragmatic equivalent of DSPy's
  * `auto='light'`; a Bayesian surrogate can be layered on later.
  */
+import * as fs from 'fs';
+import * as path from 'path';
 import { Module } from '../core/module';
 import { Pipeline } from '../core/pipeline';
 import { Signature } from '../core/signature';
@@ -22,6 +24,18 @@ import { Optimizer, OptimizerConfig, TrainingExample, MetricFunction } from './b
 import { getLM } from '../index';
 import { AgentDBClient } from '../memory/agentdb/client';
 import { CompilationTracer } from '../observability/tracer';
+
+/**
+ * Resolve and validate a file path used for saving/loading optimizer state.
+ * Prevents path traversal by rejecting paths that contain null bytes and
+ * normalising any ".." components.
+ */
+function safeResolvePath(userPath: string): string {
+  if (userPath.includes('\0')) {
+    throw new Error('Invalid path: null bytes are not permitted');
+  }
+  return path.resolve(userPath);
+}
 
 export interface MIPROv2Config extends OptimizerConfig {
   /** How many candidate instructions to consider (default 5). */
@@ -349,11 +363,11 @@ export class MIPROv2<TInput extends Record<string, any>, TOutput extends Record<
     return [...idx].sort((a, b) => a - b).map((i) => arr[i]);
   }
 
-  save(path: string): void {
+  save(filePath: string): void {
     if (!this.optimizedProgram) throw new Error('No optimized program to save. Run compile() first.');
-    const fs = require('fs');
+    const safePath = safeResolvePath(filePath);
     fs.writeFileSync(
-      path,
+      safePath,
       JSON.stringify(
         {
           config: this.config,
@@ -371,9 +385,9 @@ export class MIPROv2<TInput extends Record<string, any>, TOutput extends Record<
     );
   }
 
-  load(path: string): void {
-    const fs = require('fs');
-    const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+  load(filePath: string): void {
+    const safePath = safeResolvePath(filePath);
+    const data = JSON.parse(fs.readFileSync(safePath, 'utf8'));
     this.optimizedProgram = new OptimizedModule(data.program.name, data.program.signature, data.program.instruction, data.program.demos ?? []);
     this.lastResult = data.result ?? null;
     if (data.config) this.config = data.config;

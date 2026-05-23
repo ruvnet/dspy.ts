@@ -13,6 +13,7 @@ import { Module } from '../core/module';
 import { Signature } from '../core/signature';
 import { getLM } from '../lm';
 import { ReActReflexion } from './react-reflexion';
+import { sanitizeUserInput } from '../utils/sanitize';
 
 /**
  * Tool that can be used by the ReAct agent
@@ -296,19 +297,27 @@ export class ReAct<
     }
     parts.push('');
 
-    // Input
+    // Input — sanitize string values to mitigate prompt injection
     parts.push('Input:');
     for (const field of this.signature.inputs) {
-      parts.push(`${field.name}: ${JSON.stringify(input[field.name])}`);
+      const raw = input[field.name];
+      const safe =
+        typeof raw === 'string' ? sanitizeUserInput(raw) : raw;
+      parts.push(`${field.name}: ${JSON.stringify(safe)}`);
     }
     parts.push('');
 
-    // Previous steps
+    // Previous steps — sanitize observation content (tool output) which may
+    // originate from untrusted external sources.
     if (steps.length > 0) {
       parts.push('Previous steps:');
       for (const step of steps.slice(-6)) {
         // Last 6 steps
-        parts.push(`${step.type.toUpperCase()}: ${step.content}`);
+        const content =
+          step.type === 'observation'
+            ? sanitizeUserInput(step.content)
+            : step.content;
+        parts.push(`${step.type.toUpperCase()}: ${content}`);
       }
       parts.push('');
     }

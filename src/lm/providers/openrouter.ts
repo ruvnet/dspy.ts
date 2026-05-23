@@ -9,6 +9,42 @@
 import { LMDriver, GenerationOptions, LMError } from '../base';
 
 /**
+ * Validate that an LM API endpoint URL uses HTTPS and does not point at a
+ * private/loopback address. This prevents SSRF when callers supply a custom
+ * endpoint at runtime.
+ */
+function validateEndpoint(endpoint: string): void {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new LMError(`Invalid endpoint URL: ${endpoint}`, 'INVALID_CONFIG');
+  }
+  if (url.protocol !== 'https:') {
+    throw new LMError(
+      `Endpoint must use HTTPS. Got: ${url.protocol}`,
+      'INVALID_CONFIG'
+    );
+  }
+  const host = url.hostname.toLowerCase();
+  const privatePatterns = [
+    /^localhost$/,
+    /^127\./,
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+    /^192\.168\./,
+    /^::1$/,
+    /^fd[0-9a-f]{2}:/i,
+  ];
+  if (privatePatterns.some((p) => p.test(host))) {
+    throw new LMError(
+      `Endpoint must not resolve to a private or loopback address. Got: ${host}`,
+      'INVALID_CONFIG'
+    );
+  }
+}
+
+/**
  * OpenRouter API configuration
  */
 export interface OpenRouterConfig {
@@ -90,10 +126,12 @@ export class OpenRouterLM implements LMDriver {
   private initialized: boolean = false;
 
   constructor(config: OpenRouterConfig) {
+    const endpoint = config.endpoint || 'https://openrouter.ai/api/v1';
+    validateEndpoint(endpoint);
     this.config = {
       apiKey: config.apiKey,
       model: config.model || 'anthropic/claude-3-5-sonnet',
-      endpoint: config.endpoint || 'https://openrouter.ai/api/v1',
+      endpoint,
       siteUrl: config.siteUrl,
       siteName: config.siteName,
       defaultOptions: config.defaultOptions || {},

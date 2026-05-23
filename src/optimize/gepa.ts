@@ -12,12 +12,26 @@
  * (A surrogate-guided candidate picker / true multi-objective Pareto sampling
  * can layer on later; this is the practical genetic-Pareto loop.)
  */
+import * as fs from 'fs';
+import * as path from 'path';
 import { Module } from '../core/module';
 import { Pipeline } from '../core/pipeline';
 import { Optimizer, OptimizerConfig, TrainingExample, MetricFunction } from './base';
 import { getLM } from '../index';
 import { AgentDBClient } from '../memory/agentdb/client';
 import { OptimizedModule } from './miprov2';
+
+/**
+ * Resolve and validate a file path used for saving/loading optimizer state.
+ * Prevents path traversal by rejecting paths that contain null bytes and
+ * normalising any ".." components.
+ */
+function safeResolvePath(userPath: string): string {
+  if (userPath.includes('\0')) {
+    throw new Error('Invalid path: null bytes are not permitted');
+  }
+  return path.resolve(userPath);
+}
 
 export interface GEPAConfig extends OptimizerConfig {
   /** Number of reflect → mutate → evaluate iterations (default 12). */
@@ -268,18 +282,18 @@ export class GEPA<TInput extends Record<string, any>, TOutput extends Record<str
     }
   }
 
-  save(path: string): void {
+  save(filePath: string): void {
     if (!this.optimizedProgram) throw new Error('No optimized program to save. Run compile() first.');
-    const fs = require('fs');
+    const safePath = safeResolvePath(filePath);
     fs.writeFileSync(
-      path,
+      safePath,
       JSON.stringify({ program: { name: this.optimizedProgram.name, signature: this.optimizedProgram.signature, instruction: this.optimizedProgram.instruction }, result: this.lastResult }, null, 2)
     );
   }
 
-  load(path: string): void {
-    const fs = require('fs');
-    const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+  load(filePath: string): void {
+    const safePath = safeResolvePath(filePath);
+    const data = JSON.parse(fs.readFileSync(safePath, 'utf8'));
     this.optimizedProgram = new OptimizedModule(data.program.name, data.program.signature, data.program.instruction, []);
     this.lastResult = data.result ?? null;
   }

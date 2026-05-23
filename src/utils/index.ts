@@ -1,2 +1,5 @@
-// Utility functions will be added as needed throughout development
-export {};
+/**
+ * Shared utility helpers.
+ */
+
+export { sanitizeUserInput, stripPromptInjection } from './sanitize';
