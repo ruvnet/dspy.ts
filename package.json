@@ -83,14 +83,13 @@
     "ts-jest": "^29.2.5",
     "typescript": "^5.7.3",
     "typedoc": "^0.27.0",
-    "@types/async-retry": "^1.4.8",
-    "@types/pino": "^7.0.5"
+    "@types/async-retry": "^1.4.8"
   },
   "dependencies": {
     "agentdb": "^1.6.1",
     "inversify": "^6.0.2",
     "reflect-metadata": "^0.2.2",
-    "zod": "^3.24.4",
+    "zod": "^3.25.76",
     "async-retry": "^1.3.3",
     "pino": "^9.14.0",
     "pino-pretty": "^13.1.3",
