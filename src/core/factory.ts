@@ -5,7 +5,7 @@ import { PredictModule } from '../modules/predict';
 /**
  * Options for creating a module
  */
-export interface ModuleOptions<TInput extends Record<string, any>, TOutput extends Record<string, any>> {
+export interface ModuleOptions<TInput extends Record<string, any>> {
   name: string;
   signature: Signature;
   promptTemplate: (input: TInput) => string;
@@ -15,14 +15,14 @@ export interface ModuleOptions<TInput extends Record<string, any>, TOutput exten
 /**
  * Factory function to create modules based on strategy
  */
-export function defineModule<TInput extends Record<string, any>, TOutput extends Record<string, any>>(
-  options: ModuleOptions<TInput, TOutput>
-): Module<TInput, TOutput> {
+export function defineModule<TInput extends Record<string, any>, TResult extends Record<string, any>>(
+  options: ModuleOptions<TInput>
+): Module<TInput, TResult> {
   const strategy = options.strategy || 'Predict';
 
   switch (strategy) {
     case 'Predict':
-      return new PredictModule<TInput, TOutput>(options);
+      return new PredictModule<TInput, TResult>(options);
     
     case 'ChainOfThought':
     case 'ReAct':

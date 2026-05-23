@@ -215,7 +215,7 @@ export class TorchModel implements LMDriver {
   /**
    * Process output tensor to text
    */
-  private processOutput(output: torch.Tensor, options?: GenerationOptions): string {
+  private processOutput(output: torch.Tensor, _options?: GenerationOptions): string {
     // For MVP, return a simple string based on the output tensor
     // This will be replaced with actual detokenization in future phases
     const shape = output.shape.join('x');

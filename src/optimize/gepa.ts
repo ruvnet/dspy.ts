@@ -293,7 +293,12 @@ export class GEPA<TInput extends Record<string, any>, TOutput extends Record<str
 
   load(filePath: string): void {
     const safePath = safeResolvePath(filePath);
-    const data = JSON.parse(fs.readFileSync(safePath, 'utf8'));
+    let data: Record<string, any>;
+    try {
+      data = JSON.parse(fs.readFileSync(safePath, 'utf8'));
+    } catch (err) {
+      throw new Error(`Failed to parse saved state from ${safePath}: ${err instanceof Error ? err.message : String(err)}`);
+    }
     this.optimizedProgram = new OptimizedModule(data.program.name, data.program.signature, data.program.instruction, []);
     this.lastResult = data.result ?? null;
   }

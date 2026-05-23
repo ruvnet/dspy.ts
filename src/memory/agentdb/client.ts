@@ -8,6 +8,7 @@
  * environments without native deps.
  */
 
+import { randomBytes } from 'crypto';
 import pino from 'pino';
 import retry from 'async-retry';
 import { AgentDBConfig, mergeConfig } from './config';
@@ -461,7 +462,7 @@ export class AgentDBClient {
   }
 
   private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    return `${Date.now()}-${randomBytes(5).toString('hex')}`;
   }
 
   private invalidateCache(): void {

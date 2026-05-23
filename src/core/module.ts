@@ -1,4 +1,4 @@
-import { Signature, FieldDefinition } from './signature';
+import { Signature } from './signature';
 
 /**
  * Base class for DSPy.ts modules.

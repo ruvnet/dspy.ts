@@ -202,7 +202,12 @@ export class BootstrapFewShot<
 
   load(filePath: string): void {
     const safePath = safeResolvePath(filePath);
-    const data = JSON.parse(fs.readFileSync(safePath, 'utf8'));
+    let data: Record<string, any>;
+    try {
+      data = JSON.parse(fs.readFileSync(safePath, 'utf8'));
+    } catch (err) {
+      throw new Error(`Failed to parse saved state from ${safePath}: ${err instanceof Error ? err.message : String(err)}`);
+    }
     // Reconstructs with the fixed demo set (dynamic selection needs a live store, which isn't serialized).
     this.optimizedProgram = new BootstrapOptimizedModule(data.program.name, data.program.signature, data.program.demos ?? []);
     if (data.config) this.config = data.config;

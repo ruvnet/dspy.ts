@@ -107,7 +107,7 @@ export class ONNXModel implements LMDriver {
     // This will be expanded in future phases to handle actual tokenization
     this.tokenizer = {
       encode: (text: string) => new Float32Array([text.length]), // Dummy implementation
-      decode: (tokens: Float32Array) => 'Decoded text' // Dummy implementation
+      decode: (_tokens: Float32Array) => 'Decoded text' // Dummy implementation
     };
   }
 

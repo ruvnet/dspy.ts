@@ -169,7 +169,7 @@ export class ChainOfThought<
    */
   private parseCoTResponse(response: string): Record<string, any> {
     // Try to extract JSON from response
-    let jsonMatch = response.match(/\{[\s\S]*\}/);
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
 
     if (jsonMatch) {
       try {
@@ -181,7 +181,7 @@ export class ChainOfThought<
         }
 
         return parsed;
-      } catch (error) {
+      } catch {
         // JSON parsing failed, fallback
       }
     }

@@ -422,7 +422,7 @@ export class ReAct<
    */
   private parseAnswer(
     answerText: string,
-    steps: ReActStep[]
+    _steps: ReActStep[]
   ): Record<string, any> {
     const result: Record<string, any> = {};
 
@@ -435,7 +435,7 @@ export class ReAct<
       const match = answerText.match(pattern);
 
       if (match) {
-        let value = match[1].trim().replace(/^["']|["']$/g, '');
+        const value = match[1].trim().replace(/^["']|["']$/g, '');
 
         // Type conversion
         if (field.type === 'number') {

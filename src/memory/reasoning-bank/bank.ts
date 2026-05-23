@@ -4,9 +4,10 @@
  * Persistent memory system for AI agents with self-learning capabilities
  */
 
+import { randomBytes } from 'crypto';
 import pino from 'pino';
 import { AgentDBClient } from '../agentdb/client';
-import { SAFLA, DEFAULT_SAFLA_CONFIG } from './safla';
+import { SAFLA } from './safla';
 import {
   KnowledgeUnit,
   Experience,
@@ -513,7 +514,7 @@ export class ReasoningBank {
    * Generate unique ID
    */
   private generateId(): string {
-    return `ku-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `ku-${Date.now()}-${randomBytes(5).toString('hex')}`;
   }
 
   /**

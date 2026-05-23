@@ -21,18 +21,21 @@ declare module 'js-pytorch' {
   }
 
   interface Linear extends Module {
-    new(inputSize: number, outputSize: number): Linear;
     copy_: (value: any) => void;
   }
 
-  interface ReLU extends Module {
-    new(): ReLU;
+  interface LinearConstructor {
+    new(inputSize: number, outputSize: number): Linear;
+  }
+
+  interface ReLUConstructor {
+    new(): Module;
   }
 
   interface NN {
     Module: typeof Module;
-    Linear: Linear;
-    ReLU: ReLU;
+    Linear: LinearConstructor;
+    ReLU: ReLUConstructor;
   }
 
   // Mock support for testing

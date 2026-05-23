@@ -387,7 +387,12 @@ export class MIPROv2<TInput extends Record<string, any>, TOutput extends Record<
 
   load(filePath: string): void {
     const safePath = safeResolvePath(filePath);
-    const data = JSON.parse(fs.readFileSync(safePath, 'utf8'));
+    let data: Record<string, any>;
+    try {
+      data = JSON.parse(fs.readFileSync(safePath, 'utf8'));
+    } catch (err) {
+      throw new Error(`Failed to parse saved state from ${safePath}: ${err instanceof Error ? err.message : String(err)}`);
+    }
     this.optimizedProgram = new OptimizedModule(data.program.name, data.program.signature, data.program.instruction, data.program.demos ?? []);
     this.lastResult = data.result ?? null;
     if (data.config) this.config = data.config;
