@@ -148,16 +148,16 @@ export class AgentDBClient {
         this.nativeBackend = true;
       }
     } catch (error) {
-      this.logger.warn('agentdb EmbeddingService unavailable — text embedding disabled', { error });
+      this.logger.warn({ error }, 'agentdb EmbeddingService unavailable — text embedding disabled');
       this.embedder = null;
       this.nativeBackend = false;
     }
 
     this.initialized = true;
-    this.logger.info('AgentDB client initialized', {
+    this.logger.info({
       embeddings: this.nativeBackend ? 'agentdb' : 'disabled',
       vectorDimension: this.config.vectorDimension,
-    });
+    }, 'AgentDB client initialized');
   }
 
   /** Pure-JS cosine-similarity vector backend (the default store). */
@@ -446,7 +446,7 @@ export class AgentDBClient {
     try {
       await this.backend?.close?.();
     } catch (error) {
-      this.logger.warn('cleanup close failed', { error });
+      this.logger.warn({ error }, 'cleanup close failed');
     }
     this.cache.clear();
     this.metaStore.clear();
@@ -494,3 +494,4 @@ export class AgentDBClient {
     return denom === 0 ? 0 : dot / denom;
   }
 }
+
