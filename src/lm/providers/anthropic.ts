@@ -16,7 +16,7 @@ export interface AnthropicConfig {
   apiKey: string;
 
   /**
-   * Model to use (default: claude-3-sonnet-20240229)
+   * Model to use (default: claude-3-5-sonnet-20241022)
    */
   model?: string;
 
@@ -60,7 +60,7 @@ export class AnthropicLM implements LMDriver {
   constructor(config: AnthropicConfig) {
     this.config = {
       apiKey: config.apiKey,
-      model: config.model || 'claude-3-sonnet-20240229',
+      model: config.model || 'claude-3-5-sonnet-20241022',
       endpoint: config.endpoint || 'https://api.anthropic.com/v1',
       defaultOptions: config.defaultOptions || {},
     };
