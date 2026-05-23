@@ -43,15 +43,15 @@ export class SAFLA {
       return;
     }
 
-    this.logger.info('Starting SAFLA auto-evolution', {
+    this.logger.info({
       interval: this.config.evolutionInterval,
-    });
+    }, 'Starting SAFLA auto-evolution');
 
     this.evolutionTimer = setInterval(async () => {
       try {
         await callback();
       } catch (error) {
-        this.logger.error('Auto-evolution failed', { error });
+        this.logger.error({ error }, 'Auto-evolution failed');
       }
     }, this.config.evolutionInterval);
   }
@@ -85,11 +85,11 @@ export class SAFLA {
       }
     }
 
-    this.logger.info('Pruning evaluation completed', {
+    this.logger.info({
       total: units.length,
       keep: keep.length,
       prune: prune.length,
-    });
+    }, 'Pruning evaluation completed');
 
     return { keep, prune };
   }
@@ -105,7 +105,7 @@ export class SAFLA {
 
     // Check confidence threshold
     if (unit.confidence < this.config.minConfidenceThreshold) {
-      this.logger.debug('Pruning low confidence unit', { id: unit.id, confidence: unit.confidence });
+      this.logger.debug({ id: unit.id, confidence: unit.confidence }, 'Pruning low confidence unit');
       return true;
     }
 
@@ -113,10 +113,10 @@ export class SAFLA {
     if (unit.usageCount >= this.config.minUsageCount) {
       // Check success rate
       if (unit.successRate < this.config.minSuccessRate) {
-        this.logger.debug('Pruning low success rate unit', {
+        this.logger.debug({
           id: unit.id,
           successRate: unit.successRate,
-        });
+        }, 'Pruning low success rate unit');
         return true;
       }
     }
@@ -124,7 +124,7 @@ export class SAFLA {
     // Check age
     const ageInDays = this.getAgeInDays(unit);
     if (ageInDays > this.config.maxAgeInDays && unit.usageCount === 0) {
-      this.logger.debug('Pruning old unused unit', { id: unit.id, ageInDays });
+      this.logger.debug({ id: unit.id, ageInDays }, 'Pruning old unused unit');
       return true;
     }
 
@@ -173,12 +173,12 @@ export class SAFLA {
     // Update timestamp
     updated.updatedAt = new Date();
 
-    this.logger.debug('Updated knowledge unit from experience', {
+    this.logger.debug({
       id: unit.id,
       success,
       newConfidence: updated.confidence,
       newSuccessRate: updated.successRate,
-    });
+    }, 'Updated knowledge unit from experience');
 
     return updated;
   }
@@ -219,7 +219,7 @@ export class SAFLA {
       return units[0];
     }
 
-    this.logger.info('Merging knowledge units', { count: units.length });
+    this.logger.info({ count: units.length }, 'Merging knowledge units');
 
     // Sort by confidence
     const sorted = [...units].sort((a, b) => b.confidence - a.confidence);
@@ -290,7 +290,7 @@ export class SAFLA {
     patterns: string[];
     recommendations: string[];
   }> {
-    this.logger.info('Evolving knowledge', { totalUnits: units.length });
+    this.logger.info({ totalUnits: units.length }, 'Evolving knowledge');
 
     const insights: string[] = [];
     const patterns: string[] = [];
@@ -322,11 +322,11 @@ export class SAFLA {
       );
     }
 
-    this.logger.info('Evolution complete', {
+    this.logger.info({
       insights: insights.length,
       patterns: patterns.length,
       recommendations: recommendations.length,
-    });
+    }, 'Evolution complete');
 
     return { insights, patterns, recommendations };
   }
@@ -380,3 +380,4 @@ export class SAFLA {
     return recommendations;
   }
 }
+
