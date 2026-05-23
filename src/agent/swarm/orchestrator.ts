@@ -45,11 +45,10 @@ export class SwarmOrchestrator {
    */
   addAgent(agent: Agent): void {
     this.agents.set(agent.id, agent);
-    this.logger.info('Agent registered', {
-      id: agent.id,
-      name: agent.name,
-      handoffs: agent.handoffs.length,
-    });
+    this.logger.info(
+      { id: agent.id, name: agent.name, handoffs: agent.handoffs.length },
+      'Agent registered'
+    );
   }
 
   /**
@@ -57,7 +56,7 @@ export class SwarmOrchestrator {
    */
   removeAgent(agentId: string): void {
     this.agents.delete(agentId);
-    this.logger.info('Agent removed', { id: agentId });
+    this.logger.info({ id: agentId }, 'Agent removed');
   }
 
   /**
@@ -85,11 +84,7 @@ export class SwarmOrchestrator {
       context = new Map(),
     } = task;
 
-    this.logger.info('Executing task', {
-      taskId: id,
-      startAgent,
-      maxHandoffs,
-    });
+    this.logger.info({ taskId: id, startAgent, maxHandoffs }, 'Executing task');
 
     const startTime = Date.now();
     const trace: AgentExecution[] = [];
@@ -130,21 +125,19 @@ export class SwarmOrchestrator {
           currentInput = execution.output;
           handoffCount++;
 
-          this.logger.debug('Handoff', {
-            from: agent.id,
-            to: currentAgentId,
-            count: handoffCount,
-          });
+          this.logger.debug(
+            { from: agent.id, to: currentAgentId, count: handoffCount },
+            'Handoff'
+          );
           continue;
         }
 
         // No handoff, task complete
         const duration = Date.now() - startTime;
-        this.logger.info('Task completed', {
-          taskId: id,
-          duration,
-          handoffs: handoffCount,
-        });
+        this.logger.info(
+          { taskId: id, duration, handoffs: handoffCount },
+          'Task completed'
+        );
 
         return {
           taskId: id,
@@ -159,11 +152,7 @@ export class SwarmOrchestrator {
       throw new Error(`Maximum handoffs (${maxHandoffs}) exceeded`);
     } catch (error) {
       const duration = Date.now() - startTime;
-      this.logger.error('Task failed', {
-        taskId: id,
-        duration,
-        error,
-      });
+      this.logger.error({ taskId: id, duration, error }, 'Task failed');
 
       return {
         taskId: id,
@@ -189,10 +178,7 @@ export class SwarmOrchestrator {
     const startTime = Date.now();
 
     try {
-      this.logger.debug('Executing agent', {
-        id: agent.id,
-        name: agent.name,
-      });
+      this.logger.debug({ id: agent.id, name: agent.name }, 'Executing agent');
 
       // Merge agent context with task context
       const mergedContext = new Map([...context, ...agent.context]);
@@ -220,10 +206,7 @@ export class SwarmOrchestrator {
       };
     } catch (error) {
       const duration = Date.now() - startTime;
-      this.logger.error('Agent execution failed', {
-        agentId: agent.id,
-        error,
-      });
+      this.logger.error({ agentId: agent.id, error }, 'Agent execution failed');
 
       return {
         agentId: agent.id,
@@ -248,10 +231,10 @@ export class SwarmOrchestrator {
     for (const handoff of agent.handoffs) {
       try {
         if (handoff.condition(context, input)) {
-          this.logger.debug('Handoff condition met', {
-            from: agent.id,
-            to: handoff.targetAgent,
-          });
+          this.logger.debug(
+            { from: agent.id, to: handoff.targetAgent },
+            'Handoff condition met'
+          );
 
           // Transfer context variables
           this.transferContext(context, handoff.transferContext);
@@ -259,11 +242,10 @@ export class SwarmOrchestrator {
           return handoff.targetAgent;
         }
       } catch (error) {
-        this.logger.error('Handoff condition check failed', {
-          from: agent.id,
-          to: handoff.targetAgent,
-          error,
-        });
+        this.logger.error(
+          { from: agent.id, to: handoff.targetAgent, error },
+          'Handoff condition check failed'
+        );
       }
     }
 
@@ -279,7 +261,7 @@ export class SwarmOrchestrator {
   ): void {
     // In this implementation, context is shared,
     // but we could filter to only transfer specified variables
-    this.logger.debug('Transferring context', { variables });
+    this.logger.debug({ variables }, 'Transferring context');
   }
 
   /**
