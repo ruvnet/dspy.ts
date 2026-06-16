@@ -1,0 +1,10 @@
+{
+  "name": "dspy-appliance-support-bot",
+  "description": "Vertical appliance: a pre-wired DSPy.ts support assistant. Ships a ready-to-run program — RetrieveModule (MMR) over an AgentDB knowledge base → ChainOfThought answer with citations → a quality metric (helpfulness + groundedness + honest 'I don't know') → MIPROv2 tuning. Bring your own KB; commands scaffold it into your repo, answer questions, and tune the answerer.",
+  "version": "0.1.0",
+  "author": { "name": "rUv", "url": "https://github.com/ruvnet" },
+  "homepage": "https://github.com/ruvnet/dspy.ts",
+  "license": "MIT",
+  "keywords": ["dspy", "dspy.ts", "appliance", "support-bot", "rag", "knowledge-base", "agentdb", "miprov2"],
+  "mcpServers": { "dspy-appliance-support-bot": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"] } }
+}

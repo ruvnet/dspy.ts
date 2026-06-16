@@ -1,0 +1,93 @@
+{
+  "name": "dspy.ts",
+  "metadata": {
+    "version": "0.1.0",
+    "description": "DSPy.ts Claude Code & Codex plugins — program AI systems on AgentDB. From practical (scaffold/compile/eval) to exotic (GEPA self-evolution) plus vertical appliances."
+  },
+  "owner": {
+    "name": "rUv",
+    "url": "https://github.com/ruvnet"
+  },
+  "plugins": [
+    {
+      "name": "dspy-core",
+      "source": "./plugins/dspy-core",
+      "description": "Scaffold, compile (BootstrapFewShot/MIPROv2/GEPA) and evaluate DSPy.ts programs; the `dspy-architect` agent designs signatures, modules and metrics.",
+      "version": "0.1.0",
+      "category": "official",
+      "status": "available"
+    },
+    {
+      "name": "dspy-optimize",
+      "source": "./plugins/dspy-optimize",
+      "description": "Deep optimizer workflows: MIPROv2 + experience replay, GEPA Pareto evolution, BootstrapFewShot dynamic demos; `optimizer-engineer` agent.",
+      "version": "0.1.0",
+      "category": "official",
+      "status": "available"
+    },
+    {
+      "name": "dspy-rag",
+      "source": "./plugins/dspy-rag",
+      "description": "RAG with `RetrieveModule` over AgentDB (HNSW, RaBitQ, MMR) wired into ChainOfThought; `rag-architect` agent; corpus-indexing commands.",
+      "version": "0.1.0",
+      "category": "official",
+      "status": "available"
+    },
+    {
+      "name": "dspy-react",
+      "source": "./plugins/dspy-react",
+      "description": "ReAct agents with tool registries + `ReActReflexion` (recall lessons, record episodes, promote skills); `react-engineer` agent.",
+      "version": "0.1.0",
+      "category": "official",
+      "status": "available"
+    },
+    {
+      "name": "dspy-observability",
+      "source": "./plugins/dspy-observability",
+      "description": "`CompilationTracer` causal-chain traces, AgentDB persistence, optional MLflow; `CachingLM` setup; `observability-engineer` agent.",
+      "version": "0.1.0",
+      "category": "official",
+      "status": "available"
+    },
+    {
+      "name": "dspy-evolution",
+      "source": "./plugins/dspy-evolution",
+      "description": "Exotic: GEPA-driven self-evolution loops that optimize a program's prompts (and the program itself) against a benchmark across runs; `evolution-coordinator` agent.",
+      "version": "0.1.0",
+      "category": "exotic",
+      "status": "available"
+    },
+    {
+      "name": "dspy-appliance-support-bot",
+      "source": "./plugins/dspy-appliance-support-bot",
+      "description": "Vertical appliance: a pre-wired DSPy.ts support assistant — RAG over a knowledge base + ChainOfThought answer + a quality metric + MIPROv2 tuning.",
+      "version": "0.1.0",
+      "category": "appliance",
+      "status": "available"
+    },
+    {
+      "name": "dspy-appliance-code-review",
+      "source": "./plugins/dspy-appliance-code-review",
+      "description": "Vertical appliance: a DSPy.ts code-review pipeline — Retrieve(repo context) → ChainOfThought(review) → metric on actionability; GEPA-tuned.",
+      "version": "0.1.0",
+      "category": "appliance",
+      "status": "available"
+    },
+    {
+      "name": "dspy-appliance-research-assistant",
+      "source": "./plugins/dspy-appliance-research-assistant",
+      "description": "Vertical appliance: a DSPy.ts research assistant — ReAct(search tools)+reflexion → synthesize → cite; optimized for grounded answers.",
+      "version": "0.1.0",
+      "category": "appliance",
+      "status": "available"
+    },
+    {
+      "name": "dspy-appliance-data-pipeline",
+      "source": "./plugins/dspy-appliance-data-pipeline",
+      "description": "Vertical appliance: a DSPy.ts ETL/classification pipeline — typed Predict modules in a Pipeline, BootstrapFewShot from a labeled CSV, evaluated batch.",
+      "version": "0.1.0",
+      "category": "appliance",
+      "status": "available"
+    }
+  ]
+}

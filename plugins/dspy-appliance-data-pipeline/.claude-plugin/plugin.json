@@ -1,0 +1,10 @@
+{
+  "name": "dspy-appliance-data-pipeline",
+  "description": "Vertical appliance: a pre-wired DSPy.ts ETL / classification pipeline. Ships a ready-to-run program — typed PredictModules composed in a Pipeline (e.g. clean → classify → extract), a CSV/JSONL batch loader, a row-level metric, and BootstrapFewShot tuning from a labeled CSV. Commands scaffold it into your repo, run a batch, and tune from labels.",
+  "version": "0.1.0",
+  "author": { "name": "rUv", "url": "https://github.com/ruvnet" },
+  "homepage": "https://github.com/ruvnet/dspy.ts",
+  "license": "MIT",
+  "keywords": ["dspy", "dspy.ts", "appliance", "data-pipeline", "etl", "classification", "batch", "bootstrap-fewshot", "agentdb"],
+  "mcpServers": { "dspy-appliance-data-pipeline": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"] } }
+}

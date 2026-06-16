@@ -1,0 +1,10 @@
+{
+  "name": "dspy-react",
+  "description": "ReAct agents for DSPy.ts — reasoning + acting loops over a tool registry, with ReActReflexion: recall prior lessons before acting, record episodes after, and promote recurring successful action sequences into reusable skills (backed by AgentDB). Includes the `react-engineer` agent and MCP tools for running/inspecting ReAct programs.",
+  "version": "0.1.0",
+  "author": { "name": "rUv", "url": "https://github.com/ruvnet" },
+  "homepage": "https://github.com/ruvnet/dspy.ts",
+  "license": "MIT",
+  "keywords": ["dspy", "dspy.ts", "react", "agent", "tool-use", "reflexion", "agentdb", "skill-library"],
+  "mcpServers": { "dspy-react": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"] } }
+}

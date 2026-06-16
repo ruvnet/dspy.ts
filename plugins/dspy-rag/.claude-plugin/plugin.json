@@ -1,0 +1,10 @@
+{
+  "name": "dspy-rag",
+  "description": "Retrieval-augmented generation for DSPy.ts — index a corpus into AgentDB (HNSW + RaBitQ + tiered storage), retrieve with MMR diversity (RetrieveModule), and wire it into a Retrieve → ChainOfThought Pipeline with grounded, cited answers. Includes the `rag-architect` agent and MCP tools for indexing/retrieving.",
+  "version": "0.1.0",
+  "author": { "name": "rUv", "url": "https://github.com/ruvnet" },
+  "homepage": "https://github.com/ruvnet/dspy.ts",
+  "license": "MIT",
+  "keywords": ["dspy", "dspy.ts", "rag", "retrieval", "agentdb", "hnsw", "mmr", "rabitq", "chain-of-thought"],
+  "mcpServers": { "dspy-rag": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"] } }
+}
