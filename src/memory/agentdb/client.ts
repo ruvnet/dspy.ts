@@ -9,6 +9,7 @@
  */
 
 import { randomBytes } from 'crypto';
+import { topK } from '../../utils/top-k';
 import pino from 'pino';
 import retry from 'async-retry';
 import { AgentDBConfig, mergeConfig } from './config';
@@ -169,12 +170,13 @@ export class AgentDBClient {
         store.set(id, { vector, metadata });
       },
       search: async (query, k) => {
-        const out: Array<{ id: string; score: number; distance: number; vector: number[]; metadata: Record<string, any> }> = [];
-        for (const [id, d] of store.entries()) {
-          const score = AgentDBClient.cosineSimilarity(query, d.vector);
-          out.push({ id, score, distance: 1 - score, vector: d.vector, metadata: d.metadata });
+        function* candidates() {
+          for (const [id, d] of store.entries()) {
+            const score = AgentDBClient.cosineSimilarity(query, d.vector);
+            yield { id, score, distance: 1 - score, vector: d.vector, metadata: d.metadata };
+          }
         }
-        return out.sort((a, b) => b.score - a.score).slice(0, k);
+        return topK(candidates(), k, (a, b) => b.score - a.score);
       },
       remove: async (id) => {
         store.delete(id);

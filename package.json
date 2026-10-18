@@ -1,7 +1,7 @@
 {
   "name": "dspy.ts",
   "version": "2.2.1",
-  "description": "DSPy.ts 2.0 - Advanced declarative AI framework with multi-agent orchestration, self-learning capabilities, and state-of-the-art optimizers. Powered by AgentDB, ReasoningBank, and Swarm architecture.",
+  "description": "TypeScript LLM framework inspired by DSPy: typed AI pipelines, automatic prompt optimization, RAG, agents and AgentDB memory.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "engines": {
@@ -62,7 +62,13 @@
     "memory-system",
     "causal-reasoning",
     "reflexion",
-    "bayesian-optimization"
+    "bayesian-optimization",
+    "dspy-typescript",
+    "llm-framework",
+    "rag",
+    "retrieval-augmented-generation",
+    "few-shot-learning",
+    "prompt-engineering"
   ],
   "author": "rUv",
   "license": "MIT",
@@ -70,7 +76,8 @@
     "dist",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "docs/assets/*.svg"
   ],
   "devDependencies": {
     "@types/jest": "^29.5.14",

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="330" viewBox="0 0 960 330" role="img" aria-labelledby="title desc">
+<title id="title">DSPy.ts: program, evaluate, improve</title><desc id="desc">A TypeScript framework for typed language model programs, automatic prompt optimization and optional AgentDB memory. Animated paths connect task definitions to evaluation and reusable instructions.</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#071222"/><stop offset="1" stop-color="#151735"/></linearGradient><linearGradient id="accent"><stop stop-color="#45ead0"/><stop offset="1" stop-color="#a19aff"/></linearGradient></defs>
+<style>text{font-family:Arial,Helvetica,sans-serif}.flow{stroke-dasharray:8 10;animation:flow 3s linear infinite}.pulse{animation:pulse 4s ease-in-out infinite}@keyframes flow{to{stroke-dashoffset:-72}}@keyframes pulse{50%{opacity:.45}}@media(prefers-reduced-motion:reduce){.flow,.pulse{animation:none}}</style>
+<rect width="960" height="330" rx="22" fill="url(#bg)"/><rect x="1" y="1" width="958" height="328" rx="21" fill="none" stroke="#344368"/>
+
+<text x="44" y="48" fill="#65e9d5" font-size="14" letter-spacing="3">DECLARATIVE AI / TYPESCRIPT</text>
+<text x="42" y="119" fill="#f1f5ff" font-size="66" font-weight="700">DSPy.ts</text>
+<text x="44" y="163" fill="#c3cee8" font-size="24">Program. Evaluate. Improve.</text>
+<text x="44" y="202" fill="#94a8c8" font-size="17">Turn examples and metrics into better prompts.</text>
+<path class="flow" d="M575 102H868V228H575Z" fill="none" stroke="url(#accent)" stroke-width="2"/>
+<rect x="594" y="70" width="240" height="64" rx="12" fill="#122a3b" stroke="#49cdbb"/><text x="714" y="109" text-anchor="middle" fill="#e0fff7" font-size="20">Typed AI program</text>
+<rect x="594" y="194" width="240" height="64" rx="12" fill="#24233e" stroke="#9d95eb"/><text x="714" y="233" text-anchor="middle" fill="#f0eaff" font-size="20">Measure and optimize</text>
+<circle class="pulse" cx="868" cy="166" r="8" fill="#61e8d2"/>
+<path d="M44 264H475" stroke="#33466a"/>
+<text x="44" y="299" fill="#b4c5df" font-size="15">PROMPTS · RAG · AGENTS · MEMORY</text>
+</svg>
