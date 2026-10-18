@@ -8,39 +8,41 @@
 [![Star on GitHub](https://img.shields.io/github/stars/ruvnet/dspy.ts?style=for-the-badge&logo=github&color=gold)](https://github.com/ruvnet/dspy.ts)
 [![🕸️ AgentDB](https://img.shields.io/badge/AgentDB-vector_memory-06b6d4?style=for-the-badge&logo=graphql&logoColor=white)](https://www.npmjs.com/package/agentdb)
 
-# DSPy.ts
+# DSPy.ts: TypeScript LLM Framework for Prompt Optimization
 
 **Program AI systems, don't prompt them — in TypeScript, on AgentDB.**
 
 </div>
 
-DSPy.ts brings Stanford's [DSPy](https://github.com/stanfordnlp/dspy) to TypeScript: you declare *signatures* (typed input → output), compose them into *modules* and *pipelines*, give an *optimizer* a metric and a handful of examples, and it tunes the prompts and demonstrations for you — no hand-crafted prompt strings. Underneath, everything that needs a vector index, a memory, or a cache runs on [`agentdb`](https://www.npmjs.com/package/agentdb): HNSW search, RaBitQ quantization, ReasoningBank, reflexion. The optimizers *remember what worked* across runs.
+![DSPy.ts: typed AI programs, prompt optimization and AgentDB memory](./docs/assets/dspy-hero.svg)
+
+DSPy.ts is a **TypeScript framework for LLM applications and automatic prompt optimization**, inspired by [DSPy](https://github.com/stanfordnlp/dspy). Define typed inputs and outputs, compose reusable modules, and evaluate prompt candidates against your metric. Build retrieval augmented generation (RAG), tool using agents, classification and question answering pipelines in Node.js.
+
+[Quick start](#quick-start) · [Capabilities](#what-you-get) · [Documentation](#documentation) · [Limitations](#roadmap--known-limitations)
 
 ### Why DSPy.ts?
 
-> Prompts are code you can't refactor. DSPy.ts makes the LM program the artifact — a signature plus modules — and lets a metric do the tuning. The TypeScript port adds end-to-end types, runs in Node and the browser, and is built **AgentDB-first**: optimizer trials, ReAct reflexions, and LM responses all persist to a real vector store, so a second `compile()` (or a second agent run) starts from what the first one learned. Built by [`rUv`](https://ruv.io).
+Turn repeated prompt editing into a measurable development loop. `BootstrapFewShot`, `MIPROv2` and `GEPA` search instructions or demonstrations using examples and a scoring function. Optional AgentDB integration supports embeddings, retrieval, replay and agent memory. Built by [rUv](https://ruv.io).
 
-### What DSPy.ts does
+### How automatic prompt optimization works
 
-`init` nothing, `npm install dspy.ts`, and your LM program becomes optimizable:
+![Define a typed task, compose modules, evaluate candidates and reuse successful instructions](./docs/assets/optimization-loop.svg)
 
-```
-Signature (typed in→out)
-        │
-        ▼
-   Module / Pipeline ──────────────►  LM  (optionally CachingLM — fuzzy AgentDB cache)
-   (Predict · ChainOfThought                       ▲
-    · ReAct(+reflexion) · Retrieve)                │
-        │                                          │
-        ▼                                          │
-   Optimizer  ───►  metric + trainset  ───►  compile()  ──►  Optimized Module
-   (BootstrapFewShot · MIPROv2 · GEPA)               │
-        │                                            │
-        ▼                                            ▼
-   AgentDB  ◄── vectors · RaBitQ · tiers · ReasoningBank · reflexions · experience replay · trace
-   (HNSW)        ▲                                   │
-                 └────────────── warm-start next compile ┘
-```
+1. Define a task with a typed signature and compose modules.
+2. Supply training examples and a metric that represents success.
+3. Compile candidate prompts or demonstrations and compare their scores.
+4. Evaluate the selected program on separate held out examples before deployment.
+
+### Practical applications
+
+| Application | Building blocks | Measure success |
+| --- | --- | --- |
+| Support ticket classification | Predict + labeled examples + optimizer | Accuracy and cost per ticket |
+| Answers grounded in documents | RetrieveModule + ChainOfThought | Answer correctness and retrieval relevance |
+| Tool using assistants | ReAct + optional reflexion memory | Task completion and tool errors |
+| Repeated workflow improvement | MIPROv2 replay or GEPA frontier | Quality on fresh examples across compilations |
+
+**Memory scope:** the current `AgentDBClient` stores vectors and metadata in process memory and uses exact cosine scanning by default. Reuse the same client to share experience between compilations. Durable vector persistence and native HNSW indexing are not implemented by this wrapper. Optional sign codes narrow candidates for approximate retrieval; they do not replace the original vectors. Browser compatibility depends on the selected modules and dependencies.
 
 > **New to DSPy?** You don't have to touch AgentDB. Define a `signature`, wrap it in `ChainOfThought`, hand a `metric` + a few examples to `BootstrapFewShot`, call `compile()`. Everything else (vector store, caching, reflexion) is opt-in.
 
@@ -98,7 +100,7 @@ const { passages, context } = await retrieve.run({ query: 'what is the capital o
 // feed `context` into a ChainOfThought("question, context -> answer")
 ```
 
-### Cross-run learning — MIPROv2 with experience replay
+### Learning across compilations with MIPROv2 experience replay
 
 ```ts
 import { MIPROv2, CompilationTracer } from 'dspy.ts';
@@ -121,14 +123,14 @@ await opt.compile(qa, trainset);
 |---|---|---|
 | 🧩 | **Composable, typed modules** | `Predict`, `ChainOfThought`, `ReAct`, `Retrieve`, `Pipeline` — declare a signature once, get end-to-end TypeScript types on inputs and outputs. |
 | 🎯 | **Self-optimizing** | `BootstrapFewShot`, `MIPROv2`, `GEPA` — hand them a metric + examples; they tune instructions and demonstrations and hand back an `OptimizedModule`. Deterministic per `seed`; `save()`/`load()`. |
-| 🧬 | **GEPA prompt evolution** | Genetic-Pareto: a per-example-scored Pareto frontier of prompt candidates, reflect-on-weakest → mutate → admit-if-non-dominated. The frontier persists to AgentDB and re-runs warm-start. |
-| ♻️ | **Experience replay** | MIPROv2 persists each compile's winning instruction (keyed by a task fingerprint); a later `compile()` of a similar task starts from what worked — stock DSPy starts cold every time. |
+| 🧬 | **GEPA prompt evolution** | Genetic-Pareto: a per-example-scored Pareto frontier of prompt candidates, reflect-on-weakest → mutate → admit-if-non-dominated. The frontier is stored in the supplied client and subsequent compilations can warm-start while that client retains it. |
+| ♻️ | **Experience replay** | MIPROv2 stores winning instructions by task fingerprint in the supplied replay client for reuse in later compilations. |
 | 🔎 | **Input-conditioned few-shot** | `BootstrapFewShot` can pick, *per input at run time*, the demos nearest the current input (vector search) instead of a fixed set. |
 | 📚 | **RAG, built-in** | `RetrieveModule` over the AgentDB vector store with Maximal-Marginal-Relevance diversity re-rank → declarative `Retrieve → ChainOfThought` pipelines. |
 | 🪞 | **ReAct reflexion** | `ReActReflexion` over AgentDB: recall lessons from failed past attempts before acting, record episodes after, and promote a tool sub-strategy to a *skill* once it succeeds repeatedly. |
-| 💾 | **AgentDB memory** | `AgentDBClient` — HNSW vector search, RaBitQ 1-bit quantization (~32× smaller), hierarchical tiers (`working`/`short`/`long`), `ReasoningBank` with semantic retrieval. Real `agentdb` classes; pure-JS fallback when native deps are absent. |
+| 💾 | **AgentDB memory** | `AgentDBClient`: in-memory cosine search, optional sign-code candidate filtering, hierarchical tiers (`working`/`short`/`long`) and AgentDB embeddings when available. |
 | ⚡ | **Fuzzy LM cache** | `CachingLM` wraps any `LMDriver` and serves `generate()` from an AgentDB vector cache — a near-identical prompt is a hit (cosine ≥ threshold, options + TTL aware). |
-| 📈 | **Observability** | `CompilationTracer` records optimizer runs + trials as a causal chain (`causedBy` per trial), persisted to AgentDB; optional `@mlflow/tracking` logging when that dep is present. |
+| 📈 | **Observability** | `CompilationTracer` records optimizer runs + trials as a causal chain (`causedBy` per trial), stored in the supplied client; optional `@mlflow/tracking` logging when that dep is present. |
 | 🔌 | **Multi-provider LM** | OpenAI, Anthropic, local ONNX, js-pytorch — `configureLM(driver)`, or compose `CachingLM` around any of them. |
 
 <details>
@@ -162,8 +164,8 @@ await opt.compile(qa, trainset);
 
 `AgentDBClient` is the substrate the rest of DSPy.ts builds on:
 
-- **Vector store** — `store` / `storeText` / `search` / `searchText` / `update` / `delete` / `batchStore` / `getStats`, with `k` / `minScore` / `includeVectors`, a search cache, and stats. Backed by `agentdb`'s `EnhancedEmbeddingService` (transformers.js / ONNX) for text → vector; falls back to a deterministic `hashEmbed` when native deps aren't available.
-- **RaBitQ quantization** — `performance.quantization: 'rabitq'` stores a 1-bit-per-dimension sign code (~32× smaller than float32); search becomes a Hamming coarse-filter → cosine re-rank of the top `rerankFactor × k`. `quantizationInfo()` reports the mode and compression ratio.
+- **Vector store** — `store` / `storeText` / `search` / `searchText` / `update` / `delete` / `batchStore` / `getStats`, with `k` / `minScore` / `includeVectors`, a search cache, and stats. Backed by `agentdb`'s `EnhancedEmbeddingService` (transformers.js / ONNX) for text → vector; `embed()` throws if embeddings are unavailable; `hashEmbed()` is an explicit deterministic alternative, not a semantic embedding.
+- **RaBitQ quantization** — `performance.quantization: 'rabitq'` stores a 1-bit-per-dimension sign code (codes alone are ~32× smaller than float32; original vectors are retained); search becomes a Hamming coarse-filter → cosine re-rank of the top `rerankFactor × k`. `quantizationInfo()` reports the mode and compression ratio.
 - **Hierarchical tiers** — `store(v, m, { tier })` (`working` | `short` | `long`, default `long`), `searchTiered({ tiers })`, `promote(id, tier)`, `evictTier(tier, { maxAgeMs, max })`, `tierCounts()`.
 - **`ReasoningBank` + `SAFLA`** — knowledge units learned from experiences, embedded via the AgentDB EmbeddingService; `retrieveSemantic(queryText, …)` does real vector search over stored units; SAFLA prunes/evolves the knowledge base.
 
@@ -200,7 +202,7 @@ DSPy.ts is moving fast; current honest gaps (tracked on the issues):
 - Consolidate the two LM registries (`src/lm/base` vs the package root).
 - A Bayesian surrogate over MIPROv2's search grid; a surrogate-guided / true multi-objective Pareto sampler for GEPA.
 - Broader test coverage (`agent/swarm`, `lm/providers`, `modules/chain-of-thought` are still light); the CI coverage gate is informational for now.
-- `npm run lint` needs the ESLint-9 flat-config migration.
+- Dependency audit findings need review before a production release; this README does not imply a security certification.
 
 ## License
 

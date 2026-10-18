@@ -1,0 +1,35 @@
+{
+  "node": "v24.19.0",
+  "platform": "linux",
+  "arch": "x64",
+  "benchmark": "cosine scan + result selection; excludes cache, initialization and model calls",
+  "results": [
+    {
+      "n": 10000,
+      "dimensions": 16,
+      "k": 10,
+      "beforeMedianMs": 3.6031250000000057,
+      "afterMedianMs": 0.6508110000000045,
+      "speedup": 5.536361555044369,
+      "identicalResults": true
+    },
+    {
+      "n": 10000,
+      "dimensions": 384,
+      "k": 10,
+      "beforeMedianMs": 11.182780000000093,
+      "afterMedianMs": 8.422918999999979,
+      "speedup": 1.3276608738609645,
+      "identicalResults": true
+    },
+    {
+      "n": 50000,
+      "dimensions": 16,
+      "k": 10,
+      "beforeMedianMs": 22.490949,
+      "afterMedianMs": 4.791257000000087,
+      "speedup": 4.6941646002290405,
+      "identicalResults": true
+    }
+  ]
+}
