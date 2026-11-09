@@ -5,6 +5,18 @@ All notable changes to DSPy.ts will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2026-11-09
+
+### Security
+- Dropped the unused `zod` dependency (no source file imports it). A clean `npm install dspy.ts` now resolves the transitive zod to a patched 4.x, clearing the zod high advisory. `npm audit --omit=dev` on a clean install: 1 critical / 4 high → 1 critical / 2 high.
+- Remaining: `tar` (critical) and `node-gyp`/`cacache` (high) arrive through `js-pytorch@0.7.2 → @eduardoleao052/gpu → gl@8.1.6 → node-gyp@10`. `gl` has no release on a fixed node-gyp, and `js-pytorch@1.0.0` ships without its entry file, so this needs `js-pytorch` to become an optional peer loaded lazily — a behaviour change held for a minor release.
+
+### Fixed
+- README quick start now runs as written: it uses an offline stand-in LM and shows the real output. The previous snippet called `DummyLM` without `init()` and could not parse its plain-text reply in `ChainOfThought`.
+
+### Changed
+- npm metadata: homepage `https://ruv.io`, 20 keywords, supported environments in the README.
+
 ## [2.3.0] - 2026-11-08
 
 ### Fixed
