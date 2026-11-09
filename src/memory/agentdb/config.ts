@@ -67,14 +67,24 @@ export interface AgentDBConfig {
    */
   storage: {
     /**
-     * Storage path for persistent data
+     * Storage path for persistent data. Only a path passed explicitly by the
+     * caller is persisted (agentdb RVF file; a path ending in `.rvf` is the
+     * file, anything else a directory holding `vectors.rvf`). The default is
+     * never written to.
      */
     path: string;
 
     /**
-     * Enable in-memory mode (no persistence)
+     * Enable in-memory mode (no persistence, even if `path` is set)
      */
     inMemory: boolean;
+
+    /**
+     * Vector backend: `'auto'` (default) uses agentdb >= 3.7 when it loads and
+     * the in-memory JS store otherwise; `'agentdb'` requires agentdb;
+     * `'memory'` always uses the JS store.
+     */
+    backend?: 'auto' | 'agentdb' | 'memory';
 
     /**
      * Auto-save interval in milliseconds

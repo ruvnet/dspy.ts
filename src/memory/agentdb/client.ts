@@ -1,15 +1,15 @@
 /**
  * AgentDB Client
  *
- * Real `agentdb`-backed vector store for DSPy.ts. Uses `createDatabase`
- * (sql.js / better-sqlite3), `EmbeddingService` (transformers.js / ONNX), and
- * `HNSWIndex` (approximate nearest-neighbour) when the runtime supports them,
- * and a pure-JS in-memory backend otherwise — so `import 'dspy.ts'` works in
- * environments without native deps.
+ * Vector store for DSPy.ts. When the optional `agentdb` (>= 3.7) package
+ * loads, vectors live in an agentdb RVF store: native HNSW search, native
+ * metadata filters, and a durable single file when `storage.path` is given.
+ * Otherwise a pure-JS in-memory backend with the same filter semantics is used,
+ * so `import 'dspy.ts'` works without native deps. Text embeddings use
+ * agentdb's `EmbeddingService` and are loaded on first `embed()`.
  */
 
 import { randomBytes } from 'crypto';
-import { topK } from '../../utils/top-k';
 import pino from 'pino';
 import retry from 'async-retry';
 import { AgentDBConfig, mergeConfig } from './config';
@@ -20,6 +20,21 @@ import {
   BatchResult,
   AgentDBStats,
 } from './types';
+import { toFilterExpr, matchesFilter, FilterExpr } from './filter';
+import {
+  VectorBackend,
+  createAgentDBBackend,
+  createMemoryBackend,
+  importOptional,
+  isPermanentError,
+  cosineSimilarity,
+  packBits,
+  hamming,
+} from './backends';
+
+/** Default local embedding model (registered with agentdb's EmbeddingService). */
+const EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2';
+const EMBEDDING_DIMENSION = 384;
 
 /**
  * Hierarchical memory tiers. `working` is small/ephemeral scratch space,
@@ -27,53 +42,16 @@ import {
  */
 export type MemoryTier = 'working' | 'short' | 'long';
 
-/** RaBitQ-style 1-bit-per-dimension sign code (bit i = vector[i] >= 0). */
-function packBits(vector: number[]): Uint8Array {
-  const out = new Uint8Array(Math.ceil(vector.length / 8));
-  for (let i = 0; i < vector.length; i++) {
-    if (vector[i] >= 0) out[i >> 3] |= 1 << (i & 7);
-  }
-  return out;
-}
-
-/** Hamming distance between two equal-length packed bit codes. */
-function hamming(a: Uint8Array, b: Uint8Array): number {
-  let d = 0;
-  for (let i = 0; i < a.length; i++) {
-    let x = a[i] ^ b[i];
-    while (x) {
-      x &= x - 1;
-      d++;
-    }
-  }
-  return d;
-}
-
-/** Minimal vector backend used both for the real HNSW path and the fallback. */
-interface VectorBackend {
-  insert(id: string, vector: number[], metadata: Record<string, any>): Promise<void>;
-  search(
-    query: number[],
-    k: number,
-    filter?: Record<string, any>
-  ): Promise<Array<{ id: string; score: number; distance: number; vector?: number[]; metadata?: Record<string, any> }>>;
-  remove(id: string): Promise<void>;
-  update?(id: string, vector: number[], metadata: Record<string, any>): Promise<void>;
-  size(): number;
-  /** Native HNSW index when available — exposed so other layers can reuse it. */
-  readonly native?: unknown;
-  close?(): Promise<void>;
-}
-
 export class AgentDBClient {
   private config: AgentDBConfig;
   private logger: pino.Logger;
   private initialized = false;
   private backend: VectorBackend | null = null;
-  /** `agentdb.EmbeddingService` instance when available — text → vector. */
+  /** `agentdb.EmbeddingService` instance once loaded — text → vector. */
   private embedder: any = null;
-  /** Whether the real `agentdb` HNSW path is active (vs. the JS fallback). */
-  private nativeBackend = false;
+  private embedderLoad: Promise<any> | null = null;
+  /** Only an explicitly configured path is persisted (never the default). */
+  private readonly persistPath: string | undefined;
   private cache = new Map<string, SearchResult[]>();
   private metaStore = new Map<string, VectorData>();
   /** Packed 1-bit codes per id (only populated when quantization === 'rabitq'). */
@@ -92,20 +70,32 @@ export class AgentDBClient {
 
   constructor(config?: Partial<AgentDBConfig>) {
     this.config = mergeConfig(config || {});
+    const storage = config?.storage;
+    this.persistPath = storage?.path && storage.inMemory !== true ? storage.path : undefined;
     this.logger = pino({ level: process.env.LOG_LEVEL || 'info', name: 'agentdb-client' });
   }
 
-  /** True when the real `agentdb` HNSW backend is in use. */
+  /** True when the agentdb RVF vector store is in use (vs. the JS fallback). */
   get isNative(): boolean {
-    return this.nativeBackend;
+    return this.backend?.kind === 'agentdb-rvf';
   }
 
-  /** The `agentdb.EmbeddingService` (or null when running on the JS fallback). */
+  /** Active vector backend: `'agentdb-rvf'`, `'memory'`, or null before init(). */
+  get backendKind(): VectorBackend['kind'] | null {
+    return this.backend?.kind ?? null;
+  }
+
+  /** True when a durable store path is configured and the agentdb backend is active. */
+  get isPersistent(): boolean {
+    return this.isNative && !!this.persistPath;
+  }
+
+  /** The `agentdb.EmbeddingService` (null until the first successful `embed()`). */
   get embeddingService(): any {
     return this.embedder;
   }
 
-  /** The native `agentdb.HNSWIndex` when active (so other layers can share it). */
+  /** The native agentdb vector backend when active (so other layers can share it). */
   get vectorIndex(): unknown {
     return this.backend?.native ?? null;
   }
@@ -132,63 +122,87 @@ export class AgentDBClient {
       return;
     }
 
-    this.backend = this.createVectorBackend();
-    // Wire the real `agentdb` EmbeddingService for text → vector when its
-    // native deps (transformers.js / ONNX) load; otherwise text embedding is
-    // disabled but vector store/search still work.
-    // NOTE: `agentdb.HNSWIndex` is pattern-table-backed (it builds from a
-    //   `pattern_embeddings` table), not a generic KNN index — wiring a proper
-    //   AgentDB-backed ANN index (WASMVectorSearch / ReasoningBank patterns)
-    //   is tracked in #8 (P0b).
-    try {
-      const agentdb: any = await import('agentdb');
-      const Embed = agentdb.EnhancedEmbeddingService || agentdb.EmbeddingService;
-      if (typeof Embed === 'function') {
-        const e = new Embed({ dimensions: this.config.vectorDimension });
-        if (typeof e.initialize === 'function') await e.initialize();
-        this.embedder = e;
-        this.nativeBackend = true;
+    const mode = this.config.storage.backend ?? 'auto';
+    let backend: VectorBackend | null = null;
+    if (mode !== 'memory') {
+      backend = await createAgentDBBackend({
+        dimension: this.config.vectorDimension,
+        path: this.persistPath,
+      });
+      if (!backend && mode === 'agentdb') {
+        throw new Error(
+          'agentdb vector backend unavailable — install agentdb@^3.7.2 (Node >= 20.9) or use storage.backend "memory"'
+        );
       }
-    } catch (error) {
-      this.logger.warn({ error }, 'agentdb EmbeddingService unavailable — text embedding disabled');
-      this.embedder = null;
-      this.nativeBackend = false;
+      if (!backend && this.persistPath) {
+        this.logger.warn(
+          { path: this.persistPath },
+          'agentdb unavailable — falling back to the in-memory store; vectors will NOT be persisted'
+        );
+      }
     }
+    this.backend = backend ?? createMemoryBackend();
+    this.stats.totalVectors = this.backend.size();
 
     this.initialized = true;
-    this.logger.info({
-      embeddings: this.nativeBackend ? 'agentdb' : 'disabled',
-      vectorDimension: this.config.vectorDimension,
-    }, 'AgentDB client initialized');
+    this.logger.debug(
+      {
+        backend: this.backend.kind,
+        persistent: this.isPersistent,
+        vectorDimension: this.config.vectorDimension,
+      },
+      'AgentDB client initialized'
+    );
   }
 
-  /** Pure-JS cosine-similarity vector backend (the default store). */
-  private createVectorBackend(): VectorBackend {
-    const store = new Map<string, { vector: number[]; metadata: Record<string, any> }>();
-    return {
-      insert: async (id, vector, metadata) => {
-        store.set(id, { vector, metadata });
-      },
-      search: async (query, k) => {
-        function* candidates() {
-          for (const [id, d] of store.entries()) {
-            const score = AgentDBClient.cosineSimilarity(query, d.vector);
-            yield { id, score, distance: 1 - score, vector: d.vector, metadata: d.metadata };
-          }
+  /**
+   * Load agentdb's EmbeddingService once. Only a real transformers.js pipeline
+   * counts: agentdb silently substitutes hash "mock" embeddings when the model
+   * cannot load, and those are not semantic.
+   */
+  private async loadEmbedder(): Promise<any> {
+    if (this.embedder) return this.embedder;
+    if (!this.embedderLoad) {
+      this.embedderLoad = (async () => {
+        const agentdb = await importOptional('agentdb');
+        const Embed = agentdb?.EnhancedEmbeddingService || agentdb?.EmbeddingService;
+        if (typeof Embed !== 'function') return null;
+        try {
+          const e = new Embed({
+            model: EMBEDDING_MODEL,
+            dimension: EMBEDDING_DIMENSION,
+            provider: 'transformers',
+          });
+          if (typeof e.initialize === 'function') await e.initialize();
+          const active = typeof e.getRuntimeInfo === 'function' ? e.getRuntimeInfo()?.active : undefined;
+          if (active !== 'transformers') return null;
+          return e;
+        } catch (error) {
+          this.logger.warn({ error }, 'agentdb EmbeddingService unavailable — text embedding disabled');
+          return null;
         }
-        return topK(candidates(), k, (a, b) => b.score - a.score);
+      })();
+    }
+    this.embedder = await this.embedderLoad;
+    return this.embedder;
+  }
+
+  /** Run a backend call with retries, failing fast on errors a retry cannot fix. */
+  private withRetry<T>(fn: () => Promise<T>): Promise<T> {
+    return retry(
+      async (bail) => {
+        try {
+          return await fn();
+        } catch (err) {
+          if (isPermanentError(err)) {
+            bail(err as Error);
+            return undefined as never;
+          }
+          throw err;
+        }
       },
-      remove: async (id) => {
-        store.delete(id);
-      },
-      update: async (id, vector, metadata) => {
-        if (store.has(id)) store.set(id, { vector, metadata });
-      },
-      size: () => store.size,
-      close: async () => {
-        store.clear();
-      },
-    };
+      { retries: 3, minTimeout: 100, maxTimeout: 1000 }
+    );
   }
 
   async store(
@@ -204,11 +218,7 @@ export class AgentDBClient {
     }
     const id = this.generateId();
     const now = new Date();
-    await retry(() => this.backend!.insert(id, vector, metadata), {
-      retries: 3,
-      minTimeout: 100,
-      maxTimeout: 1000,
-    });
+    await this.withRetry(() => this.backend!.insert(id, vector, metadata));
     this.metaStore.set(id, { id, vector, metadata, createdAt: now, updatedAt: now });
     this.itemTier.set(id, opts.tier ?? 'long');
     if (this.config.performance.quantization === 'rabitq') this.bitStore.set(id, packBits(vector));
@@ -231,12 +241,13 @@ export class AgentDBClient {
    * Throws if no embedding service is available.
    */
   async embed(text: string): Promise<number[]> {
-    if (!this.embedder || typeof this.embedder.embed !== 'function') {
+    const embedder = await this.loadEmbedder();
+    if (!embedder || typeof embedder.embed !== 'function') {
       throw new Error(
         'EmbeddingService not available — pass vectors directly or run in an environment with agentdb embeddings.'
       );
     }
-    const raw = await this.embedder.embed(text);
+    const raw = await embedder.embed(text);
     const v = Array.isArray(raw) ? raw : Array.from(raw as ArrayLike<number>);
     return this.fitToDimension(v);
   }
@@ -251,7 +262,10 @@ export class AgentDBClient {
 
   async search(query: number[], options: SearchOptions = {}): Promise<SearchResult[]> {
     this.ensureInitialized();
-    const { k = 10, minScore = 0.0, filter = {}, includeVectors = false } = options;
+    const { k = 10, minScore = 0.0, filter, includeVectors = false } = options;
+    // Normalise (and validate) up front: an unsupported filter throws instead
+    // of silently returning unfiltered results.
+    const expr = toFilterExpr(filter);
 
     const cacheKey = JSON.stringify({ query, options });
     const cached = this.cache.get(cacheKey);
@@ -265,11 +279,8 @@ export class AgentDBClient {
     const startTime = performance.now();
     const useRabitq = this.config.performance.quantization === 'rabitq' && this.bitStore.size > 0;
     const raw = useRabitq
-      ? this.coarseThenRerank(query, k)
-      : await retry(
-          () => this.backend!.search(query, k, Object.keys(filter).length > 0 ? filter : undefined),
-          { retries: 3, minTimeout: 100, maxTimeout: 1000 }
-        );
+      ? this.coarseThenRerank(query, k, expr)
+      : await this.withRetry(() => this.backend!.search(query, k, expr));
 
     const results: SearchResult[] = raw
       .map((r) => {
@@ -301,11 +312,14 @@ export class AgentDBClient {
   }
 
   /** RaBitQ coarse pass (Hamming) → cosine re-rank of the top `rerankFactor × k`. */
-  private coarseThenRerank(query: number[], k: number) {
+  private coarseThenRerank(query: number[], k: number, filter: FilterExpr | null) {
     const qBits = packBits(query);
     const rerankFactor = this.config.performance.rerankFactor ?? 3;
     const coarse: Array<{ id: string; h: number }> = [];
-    for (const [id, b] of this.bitStore.entries()) coarse.push({ id, h: hamming(qBits, b) });
+    for (const [id, b] of this.bitStore.entries()) {
+      if (filter && !matchesFilter(filter, this.metaStore.get(id)?.metadata)) continue;
+      coarse.push({ id, h: hamming(qBits, b) });
+    }
     coarse.sort((a, b) => a.h - b.h);
     return coarse
       .slice(0, Math.max(k * rerankFactor, k))
@@ -395,13 +409,7 @@ export class AgentDBClient {
     const vector = data.vector ?? existing?.vector;
     const metadata = data.metadata ?? existing?.metadata ?? {};
     if (!vector) throw new Error(`Cannot update ${id}: unknown vector`);
-    await retry(
-      () =>
-        this.backend!.update
-          ? this.backend!.update(id, vector, metadata)
-          : this.backend!.insert(id, vector, metadata),
-      { retries: 3, minTimeout: 100, maxTimeout: 1000 }
-    );
+    await this.withRetry(() => this.backend!.update(id, vector, metadata));
     this.metaStore.set(id, {
       id,
       vector,
@@ -415,7 +423,7 @@ export class AgentDBClient {
 
   async delete(id: string): Promise<void> {
     this.ensureInitialized();
-    await retry(() => this.backend!.remove(id), { retries: 3, minTimeout: 100, maxTimeout: 1000 });
+    await this.withRetry(() => this.backend!.remove(id));
     this.metaStore.delete(id);
     this.bitStore.delete(id);
     this.itemTier.delete(id);
@@ -447,7 +455,9 @@ export class AgentDBClient {
   async cleanup(): Promise<void> {
     if (!this.initialized) return;
     try {
-      await this.backend?.close?.();
+      // agentdb RVF: closeAsync() flushes, releases the writer lock and removes
+      // the private temp dir of an in-memory store.
+      await this.backend?.close();
     } catch (error) {
       this.logger.warn({ error }, 'cleanup close failed');
     }
@@ -455,6 +465,7 @@ export class AgentDBClient {
     this.metaStore.clear();
     this.bitStore.clear();
     this.itemTier.clear();
+    this.backend = null;
     this.initialized = false;
   }
 
@@ -484,17 +495,7 @@ export class AgentDBClient {
   }
 
   static cosineSimilarity(a: number[], b: number[]): number {
-    if (a.length !== b.length) return 0;
-    let dot = 0,
-      na = 0,
-      nb = 0;
-    for (let i = 0; i < a.length; i++) {
-      dot += a[i] * b[i];
-      na += a[i] * a[i];
-      nb += b[i] * b[i];
-    }
-    const denom = Math.sqrt(na) * Math.sqrt(nb);
-    return denom === 0 ? 0 : dot / denom;
+    return cosineSimilarity(a, b);
   }
 }
 

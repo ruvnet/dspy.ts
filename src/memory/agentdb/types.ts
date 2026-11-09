@@ -4,6 +4,8 @@
  * Type definitions for AgentDB operations
  */
 
+import type { SearchFilter } from './filter';
+
 /**
  * Vector data stored in AgentDB
  */
@@ -74,9 +76,11 @@ export interface SearchOptions {
   minScore?: number;
 
   /**
-   * Filter metadata
+   * Metadata filter: a predicate object (`{ kind: 'doc', score: { $gt: 0.5 } }`)
+   * or an agentdb/rvf expression (`{ op: 'eq', field: 'kind', value: 'doc' }`).
+   * Only matching items are returned.
    */
-  filter?: Record<string, any>;
+  filter?: SearchFilter;
 
   /**
    * Include vectors in results

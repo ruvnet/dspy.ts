@@ -42,7 +42,7 @@ Turn repeated prompt editing into a measurable development loop. `BootstrapFewSh
 | Tool using assistants | ReAct + optional reflexion memory | Task completion and tool errors |
 | Repeated workflow improvement | MIPROv2 replay or GEPA frontier | Quality on fresh examples across compilations |
 
-**Memory scope:** the current `AgentDBClient` stores vectors and metadata in process memory and uses exact cosine scanning by default. Reuse the same client to share experience between compilations. Durable vector persistence and native HNSW indexing are not implemented by this wrapper. Optional sign codes narrow candidates for approximate retrieval; they do not replace the original vectors. Browser compatibility depends on the selected modules and dependencies.
+**Memory scope:** with the optional [`agentdb`](https://www.npmjs.com/package/agentdb) ≥ 3.7.2 installed (Node ≥ 20.9), `AgentDBClient` stores vectors in an agentdb RVF store with native HNSW search and metadata filters; pass an explicit `storage.path` to persist it to a single `.rvf` file that survives reopen (the default config never writes to disk). Without agentdb it falls back to an in-memory exact cosine scan with the same filter semantics. Tiers, sign codes and `includeVectors` are tracked in process and are not restored on reopen. Browser compatibility depends on the selected modules and dependencies.
 
 > **New to DSPy?** You don't have to touch AgentDB. Define a `signature`, wrap it in `ChainOfThought`, hand a `metric` + a few examples to `BootstrapFewShot`, call `compile()`. Everything else (vector store, caching, reflexion) is opt-in.
 
@@ -164,7 +164,8 @@ await opt.compile(qa, trainset);
 
 `AgentDBClient` is the substrate the rest of DSPy.ts builds on:
 
-- **Vector store** — `store` / `storeText` / `search` / `searchText` / `update` / `delete` / `batchStore` / `getStats`, with `k` / `minScore` / `includeVectors`, a search cache, and stats. Backed by `agentdb`'s `EnhancedEmbeddingService` (transformers.js / ONNX) for text → vector; `embed()` throws if embeddings are unavailable; `hashEmbed()` is an explicit deterministic alternative, not a semantic embedding.
+- **Vector store** — `store` / `storeText` / `search` / `searchText` / `update` / `delete` / `batchStore` / `getStats`, with `k` / `minScore` / `filter` / `includeVectors`, a search cache, and stats. `backendKind` reports `'agentdb-rvf'` or `'memory'`; `storage.backend` (`'auto'` | `'agentdb'` | `'memory'`) picks one explicitly. Text → vector uses `agentdb`'s `EmbeddingService` (transformers.js, loaded on first `embed()`); `embed()` throws if real embeddings are unavailable; `hashEmbed()` is an explicit deterministic alternative, not a semantic embedding.
+- **Filtered search** — `search(v, { filter: { kind: 'doc', score: { $gt: 0.5 } } })` (operators `$eq $ne $lt $le $gt $ge $in $range`) or an agentdb expression `{ op: 'eq', field: 'kind', value: 'doc' }` with `and` / `or` / `not`. Only matching items are returned, filtered before top-k; unsupported filter shapes throw rather than being ignored.
 - **RaBitQ quantization** — `performance.quantization: 'rabitq'` stores a 1-bit-per-dimension sign code (codes alone are ~32× smaller than float32; original vectors are retained); search becomes a Hamming coarse-filter → cosine re-rank of the top `rerankFactor × k`. `quantizationInfo()` reports the mode and compression ratio.
 - **Hierarchical tiers** — `store(v, m, { tier })` (`working` | `short` | `long`, default `long`), `searchTiered({ tiers })`, `promote(id, tier)`, `evictTier(tier, { maxAgeMs, max })`, `tierCounts()`.
 - **`ReasoningBank` + `SAFLA`** — knowledge units learned from experiences, embedded via the AgentDB EmbeddingService; `retrieveSemantic(queryText, …)` does real vector search over stored units; SAFLA prunes/evolves the knowledge base.
@@ -182,6 +183,18 @@ await opt.compile(qa, trainset);
 
 ---
 
+## Works with agentdb
+
+DSPy.ts uses [`agentdb`](https://github.com/ruvnet/agentdb) ([npm](https://www.npmjs.com/package/agentdb)) ≥ 3.7.2 as its optional vector store: `AgentDBClient` opens an agentdb RVF backend (`agentdb/backends`) with native filtered search, isolated in-memory stores and single-file persistence. It is an optional dependency loaded lazily, so DSPy.ts still installs and runs without it.
+
+```ts
+const db = new AgentDBClient({ vectorDimension: 384, storage: { path: './data/memory', inMemory: false } });
+await db.init(); // db.backendKind === 'agentdb-rvf'
+await db.store(vec, { kind: 'doc' });
+const hits = await db.search(query, { k: 5, filter: { kind: 'doc' } });
+await db.cleanup(); // flushes and closes; reopen the same path later
+```
+
 ## Documentation
 
 | Doc | Where |
@@ -197,7 +210,7 @@ await opt.compile(qa, trainset);
 DSPy.ts is moving fast; current honest gaps (tracked on the issues):
 
 - ONNX `generate()` returns a shape summary, not full text — needs a real tokenizer + autoregressive decode loop.
-- `agentdb.HNSWIndex` is pattern-table-backed (not a generic KNN store), so `AgentDBClient`'s search is currently a JS cosine scan — wiring `agentdb.WASMVectorSearch` (or a ReasoningBank-style table) would speed it up.
+- Hierarchical tiers and RaBitQ sign codes live in process memory, so `searchTiered` / `evictTier` / `tierCounts` do not see items restored from a persisted store.
 - Delegate ReAct reflexion / skills / compilation traces to `agentdb.ReflexionMemory` / `SkillLibrary` / `CausalMemoryGraph` directly once `AgentDBClient` exposes a `db` handle.
 - Consolidate the two LM registries (`src/lm/base` vs the package root).
 - A Bayesian surrogate over MIPROv2's search grid; a surrogate-guided / true multi-objective Pareto sampler for GEPA.
