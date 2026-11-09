@@ -5,6 +5,21 @@ All notable changes to DSPy.ts will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-11-08
+
+### Fixed
+- **`AgentDBClient.search({ filter })` now filters.** The filter was passed to a backend that never read it, so filtered searches returned unfiltered results (a filter matching nothing returned everything). The RaBitQ quantized path ignored it too. Filters are applied before top-k on every path; unsupported filter shapes throw instead of being dropped.
+
+### Changed
+- **agentdb `^1.6.1` → `^3.7.2`, now an optional dependency** loaded lazily with a native `import()` (agentdb 3.x is ESM-only). This drops the agentdb 1.x advisory chain (`agentdb`, `@xenova/transformers`, `sharp`, `@modelcontextprotocol/sdk` highs in `npm audit --omit=dev`).
+- With agentdb ≥ 3.7.2 (Node ≥ 20.9) vectors live in an agentdb RVF store (`agentdb/backends` `createBackend('rvf')`): native HNSW search, native name-based filters (`{ op, field, value }`), isolated in-memory stores whose temp dir is removed by `cleanup()` (`closeAsync()`). Without agentdb the in-memory JS store is used, with the same filter semantics.
+- `isNative` now means "agentdb vector backend active"; text embeddings use agentdb's `EmbeddingService` (`Xenova/all-MiniLM-L6-v2`) loaded on first `embed()` instead of at `init()`, and agentdb's silent mock-embedding fallback is treated as unavailable.
+- Retries no longer repeat deterministic failures (metadata type conflicts, size limits, dimension errors).
+
+### Added
+- Persistence: an explicitly passed `storage.path` (with `inMemory: false`) is a durable RVF file that survives close and reopen. The default config never writes to disk. Note: agentdb keeps one type per metadata field.
+- `storage.backend` (`'auto'` | `'agentdb'` | `'memory'`), `backendKind`, `isPersistent`; exported `toFilterExpr`, `matchesFilter` and filter types.
+
 ## [2.0.0] - 2025-11-14
 
 ### 🎉 Major Release - Complete Modernization

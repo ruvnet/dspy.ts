@@ -137,10 +137,10 @@ describe('AgentDBClient', () => {
         const v = await c.embed('hello world');
         expect(Array.isArray(v)).toBe(true);
         expect(v.length).toBeGreaterThan(0);
-        expect(c.isNative).toBe(true);
+        expect(c.embeddingService).not.toBeNull();
       } catch (err) {
         expect((err as Error).message).toMatch(/EmbeddingService not available/i);
-        expect(c.isNative).toBe(false);
+        expect(c.embeddingService).toBeNull();
       }
       await c.cleanup();
     });
