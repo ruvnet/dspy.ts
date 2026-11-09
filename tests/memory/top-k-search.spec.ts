@@ -1,6 +1,6 @@
 import { AgentDBClient } from '../../src/memory/agentdb/client';
 
-jest.mock('agentdb', () => ({}));
+jest.mock('agentdb', () => ({}), { virtual: true });
 
 it('matches full cosine sorting after insertion, update and deletion', async () => {
   const client = new AgentDBClient({ vectorDimension: 4 });
