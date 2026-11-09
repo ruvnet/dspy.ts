@@ -1,0 +1,10 @@
+{
+  "name": "dspy-appliance-research-assistant",
+  "description": "Vertical appliance: a pre-wired DSPy.ts research assistant. Ships a ready-to-run program — a ReAct agent over a search/fetch/notes tool registry, with ReActReflexion (recalls research lessons, records episodes, promotes successful search strategies into skills) → a ChainOfThought synthesizer that writes a grounded, cited answer → a groundedness/coverage metric → MIPROv2 tuning. Commands scaffold it into your repo, run a research query, and tune it.",
+  "version": "0.1.0",
+  "author": { "name": "rUv", "url": "https://github.com/ruvnet" },
+  "homepage": "https://github.com/ruvnet/dspy.ts",
+  "license": "MIT",
+  "keywords": ["dspy", "dspy.ts", "appliance", "research-assistant", "react", "reflexion", "synthesis", "citations", "agentdb"],
+  "mcpServers": { "dspy-appliance-research-assistant": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"] } }
+}

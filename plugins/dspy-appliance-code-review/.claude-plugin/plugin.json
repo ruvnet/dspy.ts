@@ -1,0 +1,10 @@
+{
+  "name": "dspy-appliance-code-review",
+  "description": "Vertical appliance: a pre-wired DSPy.ts code-review pipeline. Ships a ready-to-run program — RetrieveModule pulls relevant repo context (conventions, related code, prior reviews) from an AgentDB index → ChainOfThought produces a structured review (severity-tagged findings + suggested fixes) → an actionability metric scores it → GEPA tuning. Commands scaffold it into your repo, review a diff/file, and tune the reviewer.",
+  "version": "0.1.0",
+  "author": { "name": "rUv", "url": "https://github.com/ruvnet" },
+  "homepage": "https://github.com/ruvnet/dspy.ts",
+  "license": "MIT",
+  "keywords": ["dspy", "dspy.ts", "appliance", "code-review", "rag", "gepa", "agentdb", "pull-request"],
+  "mcpServers": { "dspy-appliance-code-review": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"] } }
+}

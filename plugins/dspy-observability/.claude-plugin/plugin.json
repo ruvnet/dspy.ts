@@ -1,0 +1,10 @@
+{
+  "name": "dspy-observability",
+  "description": "Observability for DSPy.ts — CompilationTracer captures every optimizer trial with causedBy links (causalChain to the best), persisted to AgentDB with optional MLflow export; CachingLM wraps any LM with a fuzzy AgentDB vector cache (similarity-threshold hits, TTL, hit stats). Includes the `observability-engineer` agent and MCP tools for tracing/caching.",
+  "version": "0.1.0",
+  "author": { "name": "rUv", "url": "https://github.com/ruvnet" },
+  "homepage": "https://github.com/ruvnet/dspy.ts",
+  "license": "MIT",
+  "keywords": ["dspy", "dspy.ts", "observability", "tracing", "compilation-tracer", "mlflow", "caching", "agentdb"],
+  "mcpServers": { "dspy-observability": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"] } }
+}

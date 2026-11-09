@@ -1,0 +1,11 @@
+---
+description: Tune the research-assistant's synthesizer (and the ReAct thought prompt) with MIPROv2 against a graded research set and the groundedness/coverage metric, with AgentDB experience replay and a CompilationTracer.
+argument-hint: "<research-qa.json> [--program src/dspy/research-assistant.ts] [--target synthesizer|gatherer|both] [--trials N] [--replay .dspy/research-replay] [--cache .dspy/research-cache]"
+---
+Optimize the research assistant. Parse `$ARGUMENTS` for the graded set (`[{ input:{question}, output:{mustCover:[...], answerable} }]`), `--program`, `--target` (which module's prompt to tune — default `synthesizer`; `gatherer` tunes the ReAct thought prompt; `both` does two passes), `--trials` (default 12), `--replay` (AgentDB → `replayStore`), `--cache` (AgentDB → `CachingLM`).
+
+1. Build a *training* program. For `--target synthesizer`: run the real `gatherer` (ReAct) to produce evidence per example, then optimize only the `synthesizer` `ChainOfThought` on `{question, evidence} → {answer, citations, gaps}` via `groundedAnswerMetric`. For `--target gatherer`: optimize the ReAct module's thought-prompt instruction (score the end-to-end answer, so better gathering shows up downstream). `both` = synthesizer pass, then gatherer pass.
+2. Optional: `configureLM(new CachingLM(getLM(), { store: cacheClient, similarityThreshold: 0.98, embed: 'model' }))` — research runs are expensive; cache hard.
+3. `const store = replayPath ? new AgentDBClient({ vectorDimension: 64, storage: { path: replayPath } }) : undefined; await store?.init(); const tracer = new CompilationTracer({ store });`
+4. `const opt = new MIPROv2(groundedAnswerMetric, { numTrials, numCandidateInstructions: 6, replayStore: store, replayTopK: 3, tracer }); const tuned = await opt.compile(trainingProgram, set);`
+5. `opt.save('src/dspy/research-assistant.optimized.json');` Report `opt.result` (best score, trials, `warmStarted`), `tracer.causalChain(runId)`, and the delta on a held-out slice. Flat scores ⇒ the graded set / metric — do you have `mustCover` markers and an `answerable:false` case? did the gatherer actually return evidence (a synthesizer can't be grounded if the evidence is empty)? — not the budget. The reflexion store grows on its own across runs; for ongoing prompt evolution, `dspy-evolution`'s `/dspy-evolve`.

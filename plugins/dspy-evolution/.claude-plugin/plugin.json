@@ -1,0 +1,10 @@
+{
+  "name": "dspy-evolution",
+  "description": "Exotic: GEPA-driven self-evolution for DSPy.ts programs. Run multi-generation reflective Pareto evolution against a held-out benchmark — each generation reflects on the weakest cases, mutates the program's instructions (and, optionally, swaps modules / restructures the Pipeline), persists the non-dominated frontier to AgentDB, and resumes from it next run. Includes the `evolution-coordinator` agent and MCP tools to evolve / benchmark / inspect frontiers.",
+  "version": "0.1.0",
+  "author": { "name": "rUv", "url": "https://github.com/ruvnet" },
+  "homepage": "https://github.com/ruvnet/dspy.ts",
+  "license": "MIT",
+  "keywords": ["dspy", "dspy.ts", "gepa", "self-evolution", "pareto", "prompt-evolution", "benchmark", "agentdb", "exotic"],
+  "mcpServers": { "dspy-evolution": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"] } }
+}

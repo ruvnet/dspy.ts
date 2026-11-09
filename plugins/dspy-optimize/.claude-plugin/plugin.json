@@ -1,0 +1,10 @@
+{
+  "name": "dspy-optimize",
+  "description": "Deep optimizer workflows for DSPy.ts — MIPROv2 with AgentDB experience replay (warm-start across runs), GEPA reflective Pareto-frontier prompt evolution, and BootstrapFewShot with input-conditioned dynamic demos. Includes the `optimizer-engineer` agent and MCP tools for compiling/replaying.",
+  "version": "0.1.0",
+  "author": { "name": "rUv", "url": "https://github.com/ruvnet" },
+  "homepage": "https://github.com/ruvnet/dspy.ts",
+  "license": "MIT",
+  "keywords": ["dspy", "dspy.ts", "miprov2", "gepa", "bootstrap-fewshot", "prompt-optimization", "experience-replay", "agentdb"],
+  "mcpServers": { "dspy-optimize": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"] } }
+}

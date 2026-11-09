@@ -1,0 +1,28 @@
+{
+  "name": "dspy-core",
+  "description": "Scaffold, compile and evaluate DSPy.ts programs from Claude Code / Codex. Wraps dspy.ts@^2.2.0 — signatures, modules (Predict/ChainOfThought/ReAct/Retrieve/Pipeline), optimizers (BootstrapFewShot/MIPROv2/GEPA) and the AgentDB memory layer.",
+  "version": "0.1.0",
+  "author": {
+    "name": "rUv",
+    "url": "https://github.com/ruvnet"
+  },
+  "homepage": "https://github.com/ruvnet/dspy.ts",
+  "license": "MIT",
+  "keywords": [
+    "dspy",
+    "dspy.ts",
+    "agentdb",
+    "prompt-optimization",
+    "miprov2",
+    "gepa",
+    "rag"
+  ],
+  "mcpServers": {
+    "dspy-core": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/mcp/server.js"
+      ]
+    }
+  }
+}
