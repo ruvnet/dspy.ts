@@ -19,6 +19,9 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
+      # js-pytorch -> gl falls back to a source build when its prebuilt binary is
+      # unavailable for the runner Node version; give node-gyp the X11/GL headers.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q libx11-dev libxi-dev libxext-dev libglu1-mesa-dev libglew-dev pkg-config
       - run: npm install
       - run: npm run build
       - run: npm run typecheck
