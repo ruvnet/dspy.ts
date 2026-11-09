@@ -50,20 +50,27 @@ Turn repeated prompt editing into a measurable development loop. `BootstrapFewSh
 
 ## Quick Start
 
+**Supported environments:** Node.js ≥ 18 (CommonJS `require` and ESM `import` both work). The optional `agentdb` vector backend needs Node ≥ 20.9; without it an in-memory store is used. Browser use depends on which modules and LM providers you pick.
+
 ```bash
 npm install dspy.ts
 ```
 
-```ts
-import {
-  ChainOfThought, BootstrapFewShot, MIPROv2,
-  configureLM, DummyLM,           // swap DummyLM for OpenAI / Anthropic / ONNX / torch
-} from 'dspy.ts';
+This runs offline: a stand-in LM returns fixed JSON so you can see the compile → run loop without an API key. Save it as `quick.mjs` and run `node quick.mjs`.
 
-configureLM(new DummyLM());       // or your provider
+```js
+import { ChainOfThought, BootstrapFewShot, configureLM } from 'dspy.ts';
+
+// A stand-in LM so the example runs offline. Swap in OpenAILM / AnthropicLM / ONNXModel for real use.
+configureLM({
+  init: async () => {},
+  cleanup: async () => {},
+  generate: async (prompt) =>
+    JSON.stringify({ reasoning: 'Look up the capital.', answer: prompt.includes('Italy') ? 'Rome' : 'Paris' }),
+});
 
 // 1. Declare a typed signature
-const qa = new ChainOfThought<{ question: string }, { answer: string }>({
+const qa = new ChainOfThought({
   name: 'QA',
   signature: {
     inputs:  [{ name: 'question', type: 'string', required: true }],
@@ -72,18 +79,25 @@ const qa = new ChainOfThought<{ question: string }, { answer: string }>({
 });
 
 // 2. Optimize it against a metric + a handful of examples
-const metric = (_in: { question: string }, out: { answer: string }, gold?: { answer: string }) =>
-  gold && out.answer?.trim() === gold.answer ? 1 : out.answer ? 0.3 : 0;
+const metric = (_in, out, gold) => (gold && out.answer?.trim() === gold.answer ? 1 : 0);
 
 const trainset = [
   { input: { question: 'capital of France?' }, output: { answer: 'Paris' } },
-  { input: { question: '2 + 2?' },             output: { answer: '4' } },
   { input: { question: 'largest planet?' } },              // unlabeled → bootstrapped demo
 ];
 
+// 3. Compile, then run the optimized program
 const compiled = await new BootstrapFewShot(metric).compile(qa, trainset);
-const { answer } = await compiled.run({ question: 'capital of Italy?' });
+console.log(await compiled.run({ question: 'capital of Italy?' }));
 ```
+
+Output (dspy.ts 2.3.1, Node 22, clean install):
+
+```text
+{ reasoning: 'Look up the capital.', answer: 'Rome' }
+```
+
+`DummyLM` is also exported for tests; call `await lm.init()` before `configureLM(lm)`. Its replies are plain text, so pair it with single-string-output modules such as `PredictModule`.
 
 ### RAG in three lines — `Retrieve → ChainOfThought`
 
