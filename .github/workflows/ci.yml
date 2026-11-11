@@ -39,6 +39,8 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      # Same native-build headers as build-test: js-pytorch -> gl may compile from source.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q libx11-dev libxi-dev libxext-dev libglu1-mesa-dev libglew-dev pkg-config
       - run: npm install
       - run: npm run docs
         continue-on-error: true
